@@ -24,13 +24,12 @@ dist-ssr
 *.sw?
 .cursor/
 
-# Environment variables
-.env
-
-# Dev override files (local development only)
-*.dev.ts
-*.dev.tsx
-
 # Old iterations directory
 docs/old_iterations/
 migrations/
+
+# Environment variables
+.env
+.env.local
+.env.production.local
+.env.development.local

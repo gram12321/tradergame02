@@ -6,10 +6,6 @@
 
 - **MUST fetch full textual diffs before updating the log**: use `mcp_github_get_commit` with `include_diff: true` to request the commit patch. If that does not include full file patch text, do NOT update `docs/versionlog.md`. Instead follow these steps to obtain/verifiy the full changes:
    1. Call `mcp_github_get_commit` for the target commit SHA with `include_diff: true`.
- 2. If full patch text is not present, fetch the commit's parent SHA (e.g., `mcp_github_get_commit` on the commit and read its `parents[0].sha` or request `sha + '^'`).
- 3. For every file listed in the commit metadata, call `mcp_github_get_file_contents` for both the parent SHA and the commit SHA to retrieve the old and new file contents.
- 4. Compute the textual diff locally (or rely on the `include_diff` patch when available) and verify changed lines and context. Only after verifying file-level diffs may you create or update an entry in `docs/versionlog.md`.
-
 - **Do NOT update the version log with inferred or partial information.** If the full textual diffs or both-file contents cannot be obtained via MCP tools, stop and report back; await manual input or a full patch.
 
 - **Placement & length rules:** New entries must be placed at the top of the file. Keep each entry concise (5–15 lines). Always include commit SHA, author, date, stats (+/-), and file-level summary (file paths + additions/deletions).
@@ -42,6 +38,15 @@
 
 ---
 
+
+## Version 0.00001b - Initial Documentation
+**Date:** 2025-12-26 | **Commit:** [9875d5b](https://github.com/gram12321/tradergame02/commit/9875d5b8375763acdd157b9f9da7c1d62c4dc6a8) | **Stats:** 392 additions, 23 deletions
+
+### 📚 **Documentation Files**
+- **NEW FILE:** `docs/AIDescriptions_coregame.md` (168 lines) - Core game mechanics documentation with implementation status
+- **NEW FILE:** `docs/PROJECT_INFO.md` (140 lines) - Project file structure and code statistics documentation
+- **NEW FILE:** `docs/versionlog.md` (74 lines) - Version log guidelines and update instructions for AI agents
+- `readme.md` - Cleaned up sections, removed redundant AI rules, updated localhost port reference (10 additions, 23 deletions)
 
 ## Version 0.00001a - Initial Setup: React + TypeScript + Tailwind + MCP Git + Supabase + Playwright
 **Date:** 2025-12-25 | **Commit:** [7c4f521](https://github.com/gram12321/tradergame02/commit/7c4f521e3dc80be5f8ed189f05b920ba3f3a022f) | **Stats:** 4,829 additions, 9 deletions

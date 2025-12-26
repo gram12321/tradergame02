@@ -46,8 +46,8 @@ tradegame02/
 │   │   │   ├── Login.tsx (396 lines)          # Authentication
 │   │   │   ├── Profile.tsx (528 lines)        # User profile
 │   │   │   ├── Settings.tsx (327 lines)       # User settings
-│   │   │   ├── Winepedia.tsx (55 lines)       # Wine knowledge base
-│   │   │   └── winepedia/ (1,648 lines total) # Winepedia sub-components
+│   │   │   ├── tradepedia.tsx (55 lines)       # Wine knowledge base
+│   │   │   └── tradepedia/ (1,648 lines total) # Winepedia sub-components
 │   │   │
 │   │   └── ui/ (13,959 lines total)           # UI components
 │   │       ├── components/ (2,500+ lines total) # Generic components

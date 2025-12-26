@@ -1,14 +1,6 @@
-import type { Season } from '@/lib/types/types';
+// Time system constants for tradergame
+// Day-Month-Year system: 24 days per month, 7 months per year
 
-export const SEASONS = ['Spring', 'Summer', 'Fall', 'Winter'] as const;
-
-export type SeasonName = typeof SEASONS[number];
-
-export const SEASON_ORDER: ReadonlyArray<Season> = SEASONS;
-
-export const WEEKS_PER_SEASON = 12;
-
-export const SEASONS_PER_YEAR = SEASONS.length;
-
-export const WEEKS_PER_YEAR = WEEKS_PER_SEASON * SEASONS_PER_YEAR;
-
+export const DAYS_PER_MONTH = 24;
+export const MONTHS_PER_YEAR = 7;
+export const DAYS_PER_YEAR = DAYS_PER_MONTH * MONTHS_PER_YEAR;

@@ -202,12 +202,12 @@ export function ResearchPanel() {
             },
             technology: {
                   title: 'Technology',
-                  description: 'Research advanced technologies for winemaking and vineyard management.',
+                  description: 'Research advanced technologies for operations and management.',
                   icon: '🔬'
             },
             agriculture: {
                   title: 'Agriculture',
-                  description: 'Research grape varieties and agricultural techniques.',
+                  description: 'Research production methods and techniques.',
                   icon: '🌾'
             },
             efficiency: {

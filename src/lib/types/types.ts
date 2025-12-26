@@ -20,13 +20,11 @@ export enum WorkCategory {
   FINANCE_AND_STAFF = 'FINANCE_AND_STAFF'
 }
 
-// Time System
-export type Season = 'Spring' | 'Summer' | 'Fall' | 'Winter';
-
+// Time System - Day-Month-Year for tradergame
 // Game Date structure
 export interface GameDate {
-  week: number;
-  season: Season;
+  day: number;    // 1-24
+  month: number;  // 1-7
   year: number;
 }
 
@@ -256,9 +254,9 @@ export interface WineOrder {
   status: 'pending' | 'fulfilled' | 'rejected' | 'partially_fulfilled' | 'expired';
 
   // Order expiration
-  expiresAt: number; // Absolute week number for efficient comparison (used in expireOldOrders)
-  expiresWeek: number; // Week component for display
-  expiresSeason: Season; // Season component for display
+  expiresAt: number; // Absolute day number for efficient comparison (used in expireOldOrders)
+  expiresDay: number; // Day component for display
+  expiresMonth: number; // Month component for display
   expiresYear: number; // Year component for display
 
   // Customer information
@@ -960,8 +958,8 @@ export interface PendingLoanWarning {
 // ===== GAME STATE =====
 
 export interface GameState {
-  week: number;
-  season: Season;
+  day: number;      // 1-24 (Day-Month-Year system)
+  month: number;    // 1-7
   currentYear: number;
   companyName: string;
   foundedYear: number; // Year the company was founded

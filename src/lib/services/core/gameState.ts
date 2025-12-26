@@ -13,8 +13,8 @@ import { initializeEconomyPhase } from '../finance/economyService';
 // Current active company and game state
 let currentCompany: Company | null = null;
 let gameState: Partial<GameState> = {
-  week: GAME_INITIALIZATION.STARTING_WEEK,
-  season: GAME_INITIALIZATION.STARTING_SEASON,
+  day: GAME_INITIALIZATION.STARTING_DAY,
+  month: GAME_INITIALIZATION.STARTING_MONTH,
   currentYear: GAME_INITIALIZATION.STARTING_YEAR,
   companyName: '',
   foundedYear: GAME_INITIALIZATION.STARTING_YEAR,
@@ -69,8 +69,8 @@ export const updateGameState = async (updates: Partial<GameState>): Promise<void
   if (currentCompany) {
     const companyUpdates: any = {};
     
-    if (updates.week !== undefined) companyUpdates.currentWeek = updates.week;
-    if (updates.season !== undefined) companyUpdates.currentSeason = updates.season;
+    if (updates.day !== undefined) companyUpdates.currentDay = updates.day;
+    if (updates.month !== undefined) companyUpdates.currentMonth = updates.month;
     if (updates.currentYear !== undefined) companyUpdates.currentYear = updates.currentYear;
     if (updates.money !== undefined) companyUpdates.money = updates.money;
     if (updates.prestige !== undefined) companyUpdates.prestige = updates.prestige;
@@ -94,8 +94,8 @@ export const updateGameState = async (updates: Partial<GameState>): Promise<void
   if (updates.economyPhase !== undefined) {
     try {
       await saveGameState({
-        week: gameState.week,
-        season: gameState.season,
+        day: gameState.day,
+        month: gameState.month,
         currentYear: gameState.currentYear,
         money: gameState.money,
         prestige: gameState.prestige,
@@ -138,8 +138,8 @@ export const setActiveCompany = async (company: Company): Promise<void> => {
     ensuredEconomyPhase = initializeEconomyPhase();
     try {
       await saveGameState({
-        week: company.currentWeek,
-        season: company.currentSeason,
+        day: company.currentDay,
+        month: company.currentMonth,
         currentYear: company.currentYear,
         money: company.money,
         prestige: company.prestige,
@@ -150,8 +150,8 @@ export const setActiveCompany = async (company: Company): Promise<void> => {
 
   // Update local game state to match company and DB (no fallback defaults here)
   gameState = {
-    week: company.currentWeek,
-    season: company.currentSeason,
+    day: company.currentDay,
+    month: company.currentMonth,
     currentYear: company.currentYear,
     companyName: company.name,
     foundedYear: company.foundedYear,
@@ -231,8 +231,8 @@ export const resetGameState = (): void => {
   currentCompany = null;
 
   gameState = {
-    week: GAME_INITIALIZATION.STARTING_WEEK,
-    season: GAME_INITIALIZATION.STARTING_SEASON,
+    day: GAME_INITIALIZATION.STARTING_DAY,
+    month: GAME_INITIALIZATION.STARTING_MONTH,
     currentYear: GAME_INITIALIZATION.STARTING_YEAR,
     companyName: '',
     foundedYear: GAME_INITIALIZATION.STARTING_YEAR,

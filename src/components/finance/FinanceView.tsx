@@ -17,37 +17,27 @@ import { IncomeBalanceView } from './IncomeBalanceView';
 import { CashFlowView } from './CashFlowView';
 import { ResearchPanel } from './ResearchPanel';
 import { StaffWageSummary } from './StaffWageSummary';
-import { ShareManagementPanel } from './ShareManagementPanel';
-import { BoardRoomPanel } from './BoardRoomPanel';
 import LoansView from './LoansView';
-import { FINANCE_TAB_STYLES, FINANCE_BUTTON_STYLES, SEASONS, WEEKS_PER_SEASON, type SeasonName } from '@/lib/constants';
+import { FINANCE_TAB_STYLES, FINANCE_BUTTON_STYLES } from '@/lib/constants/financeConstants';
+import { MONTHS_PER_YEAR } from '@/lib/constants/timeConstants';
 import { useGameState, useGameStateWithData } from '@/hooks';
 import { loadTransactions } from '@/lib/services';
 
 export default function FinanceView() {
   const [activeTab, setActiveTab] = useState('income');
-  const [activePeriod, setActivePeriod] = useState<'weekly' | 'season' | 'year' | 'all'>('weekly');
+  const [activePeriod, setActivePeriod] = useState<'monthly' | 'yearly' | 'all'>('monthly');
   const gameState = useGameState();
   const transactions = useGameStateWithData(loadTransactions, []);
 
   const currentYear = gameState.currentYear ?? new Date().getFullYear();
-  const currentSeason = useMemo<SeasonName>(() => {
-    const candidate = gameState.season as SeasonName | undefined;
-    return candidate && SEASONS.includes(candidate) ? candidate : 'Spring';
-  }, [gameState.season]);
-  const currentWeek = useMemo(() => {
-    const rawWeek = gameState.week ?? 1;
-    return Math.min(Math.max(rawWeek, 1), WEEKS_PER_SEASON);
-  }, [gameState.week]);
+  const currentMonth = gameState.month ?? 1;
 
   const [selectedYear, setSelectedYear] = useState(() => currentYear);
-  const [selectedSeason, setSelectedSeason] = useState<SeasonName>(() => currentSeason);
-  const [selectedWeek, setSelectedWeek] = useState(() => currentWeek);
+  const [selectedMonth, setSelectedMonth] = useState(() => currentMonth);
 
   const previousCurrentRef = useRef({
     year: currentYear,
-    season: currentSeason,
-    week: currentWeek
+    month: currentMonth
   });
 
   const availableYears = useMemo(() => {
@@ -63,29 +53,20 @@ export default function FinanceView() {
     return Array.from(years).sort((a, b) => b - a);
   }, [transactions, currentYear]);
 
-  const availableSeasons = useMemo(() => {
-    if (selectedYear === currentYear) {
-      const currentIndex = SEASONS.indexOf(currentSeason);
-      return SEASONS.slice(0, currentIndex + 1);
-    }
-    return SEASONS;
-  }, [selectedYear, currentYear, currentSeason]);
+  const availableMonths = useMemo(() => {
+    const limit = selectedYear === currentYear
+      ? currentMonth
+      : MONTHS_PER_YEAR;
 
-  const availableWeeks = useMemo(() => {
-    const limit = selectedYear === currentYear && selectedSeason === currentSeason
-      ? currentWeek
-      : WEEKS_PER_SEASON;
-
-    const clampedLimit = Math.min(Math.max(limit, 1), WEEKS_PER_SEASON);
+    const clampedLimit = Math.min(Math.max(limit, 1), MONTHS_PER_YEAR);
 
     return Array.from({ length: clampedLimit }, (_, index) => index + 1);
-  }, [selectedYear, selectedSeason, currentYear, currentSeason, currentWeek]);
+  }, [selectedYear, currentYear, currentMonth]);
 
   const periodFilters = useMemo(() => ({
     year: selectedYear,
-    season: selectedSeason,
-    week: selectedWeek
-  }), [selectedYear, selectedSeason, selectedWeek]);
+    month: activePeriod === 'monthly' ? selectedMonth : undefined
+  }), [selectedYear, selectedMonth, activePeriod]);
 
   useEffect(() => {
     if (!availableYears.includes(selectedYear)) {
@@ -94,40 +75,31 @@ export default function FinanceView() {
   }, [availableYears, selectedYear, currentYear]);
 
   useEffect(() => {
-    if (!availableSeasons.includes(selectedSeason)) {
-      setSelectedSeason(availableSeasons[availableSeasons.length - 1] ?? currentSeason);
-    }
-  }, [availableSeasons, selectedSeason, currentSeason]);
-
-  useEffect(() => {
-    if (selectedYear === currentYear && selectedSeason === currentSeason) {
-      if (selectedWeek > currentWeek) {
-        setSelectedWeek(currentWeek);
+    if (selectedYear === currentYear) {
+      if (selectedMonth > currentMonth) {
+        setSelectedMonth(currentMonth);
       }
-    } else if (selectedWeek > WEEKS_PER_SEASON) {
-      setSelectedWeek(WEEKS_PER_SEASON);
+    } else if (selectedMonth > MONTHS_PER_YEAR) {
+      setSelectedMonth(MONTHS_PER_YEAR);
     }
-  }, [selectedYear, selectedSeason, currentYear, currentSeason, currentWeek, selectedWeek]);
+  }, [selectedYear, currentYear, currentMonth, selectedMonth]);
 
   useEffect(() => {
     const previous = previousCurrentRef.current;
     const isFollowingCurrentSelection =
       selectedYear === previous.year &&
-      selectedSeason === previous.season &&
-      selectedWeek === previous.week;
+      selectedMonth === previous.month;
 
     if (isFollowingCurrentSelection) {
       setSelectedYear(currentYear);
-      setSelectedSeason(currentSeason);
-      setSelectedWeek(currentWeek);
+      setSelectedMonth(currentMonth);
     }
 
     previousCurrentRef.current = {
       year: currentYear,
-      season: currentSeason,
-      week: currentWeek
+      month: currentMonth
     };
-  }, [currentYear, currentSeason, currentWeek, selectedYear, selectedSeason, selectedWeek]);
+  }, [currentYear, currentMonth, selectedYear, selectedMonth]);
 
   const renderPeriodSelectors = () => {
     if (activePeriod === 'all') {
@@ -135,69 +107,44 @@ export default function FinanceView() {
     }
 
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-        {(activePeriod === 'weekly' || activePeriod === 'season' || activePeriod === 'year') && (
-          <div className="flex flex-col space-y-2">
-            <Label htmlFor="finance-year-select" className="text-xs uppercase tracking-wide text-gray-600">
-              Year
-            </Label>
-            <Select
-              value={String(selectedYear)}
-              onValueChange={(value) => setSelectedYear(Number(value))}
-            >
-              <SelectTrigger id="finance-year-select" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {availableYears.map(year => (
-                  <SelectItem key={year} value={String(year)}>
-                    {year}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <div className="flex flex-col space-y-2">
+          <Label htmlFor="finance-year-select" className="text-xs uppercase tracking-wide text-gray-600">
+            Year
+          </Label>
+          <Select
+            value={String(selectedYear)}
+            onValueChange={(value) => setSelectedYear(Number(value))}
+          >
+            <SelectTrigger id="finance-year-select" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {availableYears.map(year => (
+                <SelectItem key={year} value={String(year)}>
+                  {year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-        {(activePeriod === 'weekly' || activePeriod === 'season') && (
+        {activePeriod === 'monthly' && (
           <div className="flex flex-col space-y-2">
-            <Label htmlFor="finance-season-select" className="text-xs uppercase tracking-wide text-gray-600">
-              Season
+            <Label htmlFor="finance-month-select" className="text-xs uppercase tracking-wide text-gray-600">
+              Month
             </Label>
             <Select
-              value={selectedSeason}
-              onValueChange={(value) => setSelectedSeason(value as SeasonName)}
+              value={String(selectedMonth)}
+              onValueChange={(value) => setSelectedMonth(Number(value))}
             >
-              <SelectTrigger id="finance-season-select" className="w-full">
+              <SelectTrigger id="finance-month-select" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {availableSeasons.map(season => (
-                  <SelectItem key={season} value={season}>
-                    {season}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        {activePeriod === 'weekly' && (
-          <div className="flex flex-col space-y-2">
-            <Label htmlFor="finance-week-select" className="text-xs uppercase tracking-wide text-gray-600">
-              Week
-            </Label>
-            <Select
-              value={String(selectedWeek)}
-              onValueChange={(value) => setSelectedWeek(Number(value))}
-            >
-              <SelectTrigger id="finance-week-select" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {availableWeeks.map(week => (
-                  <SelectItem key={week} value={String(week)}>
-                    Week {week}
+                {availableMonths.map(month => (
+                  <SelectItem key={month} value={String(month)}>
+                    Month {month}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -226,7 +173,7 @@ export default function FinanceView() {
               <p className="text-white/90 text-sm mt-1">Track your financial performance and growth</p>
             </div>
             <div className="text-white/80 text-sm">
-              {activeTab === 'income' ? 'Income & Balance' : activeTab === 'cashflow' ? 'Cash Flow' : activeTab === 'loans' ? 'Loans' : activeTab === 'shares' ? 'Share Management' : activeTab === 'board' ? 'Board Room' : 'Research & Upgrades'}
+              {activeTab === 'income' ? 'Income & Balance' : activeTab === 'cashflow' ? 'Cash Flow' : activeTab === 'loans' ? 'Loans' : 'Research & Upgrades'}
             </div>
           </div>
         </div>
@@ -250,16 +197,6 @@ export default function FinanceView() {
             Loans
           </TabsTrigger>
           <TabsTrigger
-            value="shares"
-            className={`${FINANCE_TAB_STYLES.trigger} ${activeTab === 'shares' ? FINANCE_TAB_STYLES.active : FINANCE_TAB_STYLES.inactive}`}>
-            Shares
-          </TabsTrigger>
-          <TabsTrigger
-            value="board"
-            className={`${FINANCE_TAB_STYLES.trigger} ${activeTab === 'board' ? FINANCE_TAB_STYLES.active : FINANCE_TAB_STYLES.inactive}`}>
-            Board Room
-          </TabsTrigger>
-          <TabsTrigger
             value="upgrades"
             className={`${FINANCE_TAB_STYLES.trigger} ${activeTab === 'upgrades' ? FINANCE_TAB_STYLES.active : FINANCE_TAB_STYLES.inactive}`}>
             Research and Upgrades
@@ -270,19 +207,14 @@ export default function FinanceView() {
           <>
             <div className="mb-4 flex flex-wrap gap-2">
               <Button
-                onClick={() => setActivePeriod('weekly')}
-                className={`${FINANCE_BUTTON_STYLES.period} ${activePeriod === 'weekly' ? FINANCE_BUTTON_STYLES.periodActive : FINANCE_BUTTON_STYLES.periodInactive}`}>
-                Weekly
+                onClick={() => setActivePeriod('monthly')}
+                className={`${FINANCE_BUTTON_STYLES.period} ${activePeriod === 'monthly' ? FINANCE_BUTTON_STYLES.periodActive : FINANCE_BUTTON_STYLES.periodInactive}`}>
+                Monthly
               </Button>
               <Button
-                onClick={() => setActivePeriod('season')}
-                className={`${FINANCE_BUTTON_STYLES.period} ${activePeriod === 'season' ? FINANCE_BUTTON_STYLES.periodActive : FINANCE_BUTTON_STYLES.periodInactive}`}>
-                Season
-              </Button>
-              <Button
-                onClick={() => setActivePeriod('year')}
-                className={`${FINANCE_BUTTON_STYLES.period} ${activePeriod === 'year' ? FINANCE_BUTTON_STYLES.periodActive : FINANCE_BUTTON_STYLES.periodInactive}`}>
-                Year
+                onClick={() => setActivePeriod('yearly')}
+                className={`${FINANCE_BUTTON_STYLES.period} ${activePeriod === 'yearly' ? FINANCE_BUTTON_STYLES.periodActive : FINANCE_BUTTON_STYLES.periodInactive}`}>
+                Yearly
               </Button>
               <Button
                 onClick={() => setActivePeriod('all')}
@@ -307,12 +239,6 @@ export default function FinanceView() {
         </TabsContent>
         <TabsContent value="loans">
           <LoansView />
-        </TabsContent>
-        <TabsContent value="shares">
-          <ShareManagementPanel />
-        </TabsContent>
-        <TabsContent value="board">
-          <BoardRoomPanel />
         </TabsContent>
         <TabsContent value="upgrades">
           <ResearchPanel />

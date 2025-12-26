@@ -14,8 +14,8 @@ export const saveGameState = async (gameState: Partial<GameState>): Promise<void
     const dataToSave = {
       id: getCurrentCompanyId(),
       player_name: 'Player',
-      week: gameState.week,
-      season: gameState.season,
+      day: gameState.day,
+      month: gameState.month,
       current_year: gameState.currentYear,
       money: gameState.money || 0,
       prestige: gameState.prestige,
@@ -50,8 +50,8 @@ export const loadGameState = async (): Promise<Partial<GameState> | null> => {
 
     const record = data[0];
     return {
-      week: record.week,
-      season: record.season,
+      day: record.day,
+      month: record.month,
       currentYear: record.current_year,
       money: record.money,
       prestige: record.prestige,

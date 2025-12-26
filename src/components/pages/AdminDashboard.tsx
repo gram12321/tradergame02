@@ -1,18 +1,16 @@
 import { useState } from 'react';
-import { useLoadingState, useGameStateWithData } from '@/hooks';
+import { useLoadingState } from '@/hooks';
 import { SimpleCard, Button, Label, Input, Tabs, TabsContent, TabsList, TabsTrigger, Card, CardContent, CardDescription, CardHeader, CardTitle, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui';
 import { Settings, Users, AlertTriangle, Trash2 } from 'lucide-react';
 import { PageProps, NavigationProps } from '../../lib/types/UItypes';
 import TestViewer from '../../../test-viewer/TestViewer';
 import {
-  adminSetGoldToCompany, adminSetPlayerBalance, adminAddPrestigeToCompany, adminClearAllHighscores, adminClearCompanyValueHighscores, adminClearCompanyValuePerWeekHighscores, adminClearAllCompanies, adminClearAllUsers, adminClearAllCompaniesAndUsers, adminRecreateCustomers, adminGenerateTestOrders, adminGenerateTestContract, adminClearAllAchievements, adminFullDatabaseReset, adminSetGameDate, adminGrantAllResearch, adminRemoveAllResearch, adminSetStaffXP
+  adminSetGoldToCompany, adminSetPlayerBalance, adminAddPrestigeToCompany, adminClearAllHighscores, adminClearCompanyValueHighscores, adminClearCompanyValuePerWeekHighscores, adminClearAllCompanies, adminClearAllUsers, adminClearAllCompaniesAndUsers, adminRecreateCustomers, adminGenerateTestOrders, adminGenerateTestContract, adminClearAllAchievements, adminFullDatabaseReset, adminSetGameDate, adminGrantAllResearch, adminRemoveAllResearch
 } from '@/lib/services';
-import { getAllStaff } from '@/lib/services/user/staffService';
-import { GAME_INITIALIZATION, SEASONS, WEEKS_PER_SEASON } from '@/lib/constants';
-import type { Season } from '@/lib/types/types';
+import { GAME_INITIALIZATION } from '@/lib/constants';
+import { DAYS_PER_MONTH, MONTHS_PER_YEAR } from '@/lib/constants/timeConstants';
 
 interface AdminDashboardProps extends PageProps, NavigationProps {
-  // Inherits onBack and onNavigateToLogin from shared interfaces
 }
 
 export function AdminDashboard({ onBack, onNavigateToLogin }: AdminDashboardProps) {
@@ -20,17 +18,12 @@ export function AdminDashboard({ onBack, onNavigateToLogin }: AdminDashboardProp
   const [goldAmount, setGoldAmount] = useState('10000');
   const [playerBalanceAmount, setPlayerBalanceAmount] = useState('10000');
   const [prestigeAmount, setPrestigeAmount] = useState('100');
-  const [gameWeek, setGameWeek] = useState(String(GAME_INITIALIZATION.STARTING_WEEK));
-  const [gameSeason, setGameSeason] = useState<Season>(GAME_INITIALIZATION.STARTING_SEASON);
+  const [gameDay, setGameDay] = useState(String(GAME_INITIALIZATION.STARTING_DAY));
+  const [gameMonth, setGameMonth] = useState(String(GAME_INITIALIZATION.STARTING_MONTH));
   const [gameYear, setGameYear] = useState(String(GAME_INITIALIZATION.STARTING_YEAR));
 
-  // Staff XP state
-  const [selectedStaffId, setSelectedStaffId] = useState('');
-  const [xpCategory, setXpCategory] = useState('skill:field');
-  const [xpAmount, setXpAmount] = useState('1000');
-
-  const weekOptions = Array.from({ length: WEEKS_PER_SEASON }, (_, index) => index + 1);
-  const allStaff = useGameStateWithData(() => getAllStaff(), []);
+  const dayOptions = Array.from({ length: DAYS_PER_MONTH }, (_, index) => index + 1);
+  const monthOptions = Array.from({ length: MONTHS_PER_YEAR }, (_, index) => index + 1);
 
   // Cheat functions (for development/testing)
   const handleSetGold = () => withLoading(async () => {
@@ -54,27 +47,17 @@ export function AdminDashboard({ onBack, onNavigateToLogin }: AdminDashboardProp
     await adminAddPrestigeToCompany(amount);
   });
 
-  const handleSetStaffXP = () => withLoading(async () => {
-    if (!selectedStaffId) {
-      alert('Please select a staff member');
-      return;
-    }
-    const amount = parseFloat(xpAmount) || 1000;
-    const result = await adminSetStaffXP(selectedStaffId, xpCategory, amount);
-    if (result.success) {
-      console.log(result.message);
-      alert(result.message);
-    } else {
-      console.error(result.error);
-      alert(result.error);
-    }
-  });
 
   const handleSetGameDate = () => withLoading(async () => {
-    const parsedWeek = Number.parseInt(gameWeek, 10);
-    const safeWeek = Number.isNaN(parsedWeek)
-      ? GAME_INITIALIZATION.STARTING_WEEK
-      : Math.min(Math.max(parsedWeek, 1), WEEKS_PER_SEASON);
+    const parsedDay = Number.parseInt(gameDay, 10);
+    const safeDay = Number.isNaN(parsedDay)
+      ? GAME_INITIALIZATION.STARTING_DAY
+      : Math.min(Math.max(parsedDay, 1), DAYS_PER_MONTH);
+
+    const parsedMonth = Number.parseInt(gameMonth, 10);
+    const safeMonth = Number.isNaN(parsedMonth)
+      ? GAME_INITIALIZATION.STARTING_MONTH
+      : Math.min(Math.max(parsedMonth, 1), MONTHS_PER_YEAR);
 
     const parsedYear = Number.parseInt(gameYear, 10);
     const minimumYear = GAME_INITIALIZATION.STARTING_YEAR;
@@ -83,12 +66,13 @@ export function AdminDashboard({ onBack, onNavigateToLogin }: AdminDashboardProp
       : Math.max(parsedYear, minimumYear);
 
     await adminSetGameDate({
-      week: safeWeek,
-      season: gameSeason,
+      day: safeDay,
+      month: safeMonth,
       year: safeYear
     });
 
-    setGameWeek(String(safeWeek));
+    setGameDay(String(safeDay));
+    setGameMonth(String(safeMonth));
     setGameYear(String(safeYear));
   });
 
@@ -411,18 +395,18 @@ export function AdminDashboard({ onBack, onNavigateToLogin }: AdminDashboardProp
             >
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="game-season-select">Season</Label>
+                  <Label htmlFor="game-day-select">Day</Label>
                   <Select
-                    value={gameSeason}
-                    onValueChange={(value) => setGameSeason(value as Season)}
+                    value={gameDay}
+                    onValueChange={(value) => setGameDay(value)}
                   >
-                    <SelectTrigger id="game-season-select">
-                      <SelectValue placeholder="Select season" />
+                    <SelectTrigger id="game-day-select">
+                      <SelectValue placeholder="Select day" />
                     </SelectTrigger>
                     <SelectContent>
-                      {SEASONS.map(season => (
-                        <SelectItem key={season} value={season}>
-                          {season}
+                      {dayOptions.map(day => (
+                        <SelectItem key={day} value={String(day)}>
+                          Day {day}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -430,18 +414,18 @@ export function AdminDashboard({ onBack, onNavigateToLogin }: AdminDashboardProp
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="game-week-select">Week</Label>
+                  <Label htmlFor="game-month-select">Month</Label>
                   <Select
-                    value={gameWeek}
-                    onValueChange={(value) => setGameWeek(value)}
+                    value={gameMonth}
+                    onValueChange={(value) => setGameMonth(value)}
                   >
-                    <SelectTrigger id="game-week-select">
-                      <SelectValue placeholder="Select week" />
+                    <SelectTrigger id="game-month-select">
+                      <SelectValue placeholder="Select month" />
                     </SelectTrigger>
                     <SelectContent>
-                      {weekOptions.map(week => (
-                        <SelectItem key={week} value={String(week)}>
-                          Week {week}
+                      {monthOptions.map(month => (
+                        <SelectItem key={month} value={String(month)}>
+                          Month {month}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -497,83 +481,6 @@ export function AdminDashboard({ onBack, onNavigateToLogin }: AdminDashboardProp
               </p>
             </SimpleCard>
 
-            <SimpleCard
-              title="Staff XP Management"
-              description="Set experience points for staff members"
-            >
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="staff-select">Select Staff Member</Label>
-                  <Select
-                    value={selectedStaffId}
-                    onValueChange={(value) => setSelectedStaffId(value)}
-                  >
-                    <SelectTrigger id="staff-select">
-                      <SelectValue placeholder="Select a staff member" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {allStaff.length === 0 ? (
-                        <SelectItem value="none" disabled>No staff members found</SelectItem>
-                      ) : (
-                        allStaff.map(staff => (
-                          <SelectItem key={staff.id} value={staff.id}>
-                            {staff.name}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="xp-category-select">XP Category</Label>
-                  <Select
-                    value={xpCategory}
-                    onValueChange={(value) => setXpCategory(value)}
-                  >
-                    <SelectTrigger id="xp-category-select">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="skill:field">Skill: Field</SelectItem>
-                      <SelectItem value="skill:winery">Skill: Winery</SelectItem>
-                      <SelectItem value="skill:financeAndStaff">Skill: Finance & Staff</SelectItem>
-                      <SelectItem value="skill:sales">Skill: Sales</SelectItem>
-                      <SelectItem value="skill:administrationAndResearch">Skill: Admin & Research</SelectItem>
-                      <SelectItem value="grape:Chardonnay">Grape: Chardonnay</SelectItem>
-                      <SelectItem value="grape:Pinot Noir">Grape: Pinot Noir</SelectItem>
-                      <SelectItem value="grape:Sauvignon Blanc">Grape: Sauvignon Blanc</SelectItem>
-                      <SelectItem value="grape:Sangiovese">Grape: Sangiovese</SelectItem>
-                      <SelectItem value="grape:Tempranillo">Grape: Tempranillo</SelectItem>
-                      <SelectItem value="grape:Barbera">Grape: Barbera</SelectItem>
-                      <SelectItem value="grape:Primitivo">Grape: Primitivo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="xp-amount">XP Amount</Label>
-                  <Input
-                    id="xp-amount"
-                    type="number"
-                    value={xpAmount}
-                    onChange={(e) => setXpAmount(e.target.value)}
-                    placeholder="1000"
-                  />
-                </div>
-
-                <Button
-                  onClick={handleSetStaffXP}
-                  disabled={isLoading || !selectedStaffId}
-                  className="w-full"
-                >
-                  ⭐ Set Staff XP
-                </Button>
-                <p className="text-xs text-gray-500">
-                  Sets the XP value for the selected skill or grape variety (replaces current XP)
-                </p>
-              </div>
-            </SimpleCard>
           </div>
         </TabsContent>
 

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { getCurrentPrestige, processGameTick, clearLastCompanyIdForLogout } from '@/lib/services';
+import { getCurrentPrestige, processGameTick, clearLastCompanyIdForLogout, getCurrentCompany } from '@/lib/services';
 import { formatGameDate, formatNumber } from '@/lib/utils';
 import { NAVIGATION_EMOJIS } from '@/lib/utils';
 import { Button, Badge, Avatar, AvatarFallback, AvatarImage, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui';
@@ -7,7 +7,6 @@ import { NotificationCenter, useNotifications } from '@/components/layout/Notifi
 import { useGameState, useGameStateWithData, useLoadingState } from '@/hooks';
 import { CalendarDays, MessageSquareText, LogOut, MenuIcon, X } from 'lucide-react';
 import { PrestigeModal } from '@/components/ui';
-import { calculateCurrentPrestige, getCurrentCompany } from '@/lib/services';
 import { NavigationProps, CompanyProps } from '@/lib/types/UItypes';
 import { getEconomyPhaseColorClass } from '@/lib/utils';
 import { UnifiedTooltip } from '@/components/ui/shadCN/tooltip';
@@ -28,9 +27,7 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, onTimeAdvance,
   const [prestigeData, setPrestigeData] = useState<any>({ 
     totalPrestige: 0, 
     eventBreakdown: [],
-    companyPrestige: 0,
-    vineyardPrestige: 0,
-    vineyards: []
+    companyPrestige: 0
   });
   const consoleHook = useNotifications();
   
@@ -60,13 +57,12 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, onTimeAdvance,
 
   const handlePrestigeClick = async () => {
     try {
-      const prestigeInfo = await calculateCurrentPrestige();
+      // Simplified prestige display - can be enhanced later
+      const totalPrestige = await getCurrentPrestige();
       setPrestigeData({
-        totalPrestige: prestigeInfo.totalPrestige,
-        eventBreakdown: prestigeInfo.eventBreakdown,
-        companyPrestige: prestigeInfo.companyPrestige,
-        vineyardPrestige: prestigeInfo.vineyardPrestige,
-        vineyards: prestigeInfo.vineyards
+        totalPrestige: totalPrestige,
+        eventBreakdown: [],
+        companyPrestige: totalPrestige
       });
       setPrestigeModalOpen(true);
     } catch (error) {
@@ -83,8 +79,6 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, onTimeAdvance,
     { id: 'dashboard', label: 'Company', icon: NAVIGATION_EMOJIS.dashboard },
     { id: 'finance', label: 'Finance', icon: NAVIGATION_EMOJIS.finance },
     { id: 'staff', label: 'Staff', icon: '👥' },
-    { id: 'vineyard', label: 'Vineyard', icon: NAVIGATION_EMOJIS.vineyard },
-    { id: 'winery', label: 'Winery', icon: NAVIGATION_EMOJIS.winery },
     { id: 'sales', label: 'Sales', icon: NAVIGATION_EMOJIS.sales }
   ];
 
@@ -94,7 +88,7 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, onTimeAdvance,
         <div className="max-w-7xl mx-auto flex justify-between items-center py-0.5 px-3 sm:px-4 md:px-6 lg:px-8 text-sm">
           <div className="flex items-center space-x-4">
             <button onClick={() => handleNavigation('dashboard')} className="text-sm font-semibold">
-              🍷 Winery Management {appVersion}
+              🏢 Trader Game {appVersion}
             </button>
             
             {/* Desktop Navigation */}
@@ -119,10 +113,10 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, onTimeAdvance,
             <div className="flex items-center space-x-2 mr-2">
               <CalendarDays className="h-3.5 w-3.5" />
               <span className="text-[10px] font-medium whitespace-nowrap hidden sm:block">
-                {formatGameDate(gameState.week, gameState.season, gameState.currentYear)}
+                {formatGameDate(gameState.day, gameState.month, gameState.currentYear)}
               </span>
               <span className="text-[10px] font-medium whitespace-nowrap sm:hidden">
-                W{gameState.week}
+                D{gameState.day}
               </span>
             </div>
             
@@ -196,8 +190,7 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, onTimeAdvance,
               density="compact"
               className="max-w-sm"
               onClick={() => {
-                try { localStorage.setItem('winepedia_view', 'economy'); } catch {}
-                handleNavigation('winepedia');
+                // Economy phase display - navigation can be customized later
               }}
             >
               <Badge 
@@ -205,8 +198,7 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, onTimeAdvance,
                 className={`px-2 py-0.5 flex items-center cursor-pointer transition-colors hidden sm:flex ${getEconomyPhaseColorClass(gameState.economyPhase || 'Stable')}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  try { localStorage.setItem('winepedia_view', 'economy'); } catch {}
-                  handleNavigation('winepedia');
+                  // Economy phase display - navigation can be customized later
                 }}
               >
                 <span className="w-2 h-2 rounded-full bg-green-400 mr-1.5"></span>
@@ -218,8 +210,7 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, onTimeAdvance,
               variant="outline" 
               className={`px-1.5 py-0.5 flex items-center cursor-pointer transition-colors sm:hidden ${getEconomyPhaseColorClass(gameState.economyPhase || 'Stable')}`}
               onClick={() => {
-                try { localStorage.setItem('winepedia_view', 'economy'); } catch {}
-                handleNavigation('winepedia');
+                // Economy phase display - navigation can be customized later
               }}>
               <span className="font-medium text-xs">{gameState.economyPhase}</span>
             </Badge>
@@ -269,7 +260,7 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, onTimeAdvance,
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center space-x-2 p-1 rounded-full h-8 w-8 text-white hover:bg-red-700 hidden lg:flex">
                   <Avatar>
-                    <AvatarImage src="/assets/icon/winery-icon.png" alt="Winery" />
+                    <AvatarImage src="/assets/icon/winery-icon.png" alt="Company" />
                     <AvatarFallback className="bg-red-600 text-white">
                       {currentCompany?.name ? (() => {
                         const name = currentCompany.name;
@@ -289,7 +280,7 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, onTimeAdvance,
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end">
                 <DropdownMenuLabel>
-                  {currentCompany?.name || gameState.companyName || 'My Winery'}
+                  {currentCompany?.name || gameState.companyName || 'My Company'}
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => handleNavigation('profile')}>
@@ -313,14 +304,8 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, onTimeAdvance,
                 <DropdownMenuItem onClick={() => handleNavigation('achievements')}>
                   Achievements
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleNavigation('wine-log')}>
-                  Wine Production Log
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleNavigation('highscores')}>
                   Global Leaderboards
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleNavigation('winepedia')}>
-                  Wine-Pedia
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem 
@@ -373,7 +358,7 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, onTimeAdvance,
             <div className="space-y-1">
               <div className="flex flex-col space-y-2 mb-6 p-3 bg-blue-50 rounded-md">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">{formatGameDate(gameState.week, gameState.season, gameState.currentYear)}</span>
+                  <span className="font-medium">{formatGameDate(gameState.day, gameState.month, gameState.currentYear)}</span>
                   <Button 
                     onClick={() => {
                       handleIncrementWeek();
@@ -432,9 +417,7 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, onTimeAdvance,
                 { id: 'settings', label: 'Settings' },
                 { id: 'admin', label: 'Admin Dashboard' },
                 { id: 'highscores', label: 'Highscores' },
-                { id: 'achievements', label: 'Achievements' },
-                { id: 'wine-log', label: 'Wine Production Log' },
-                { id: 'winepedia', label: 'Wine-Pedia' }
+                { id: 'achievements', label: 'Achievements' }
               ].map(({ id, label }) => (
                 <Button
                   key={id}
@@ -506,8 +489,6 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, onTimeAdvance,
         totalPrestige={prestigeData.totalPrestige}
         eventBreakdown={prestigeData.eventBreakdown}
         companyPrestige={prestigeData.companyPrestige}
-        vineyardPrestige={prestigeData.vineyardPrestige}
-        vineyards={prestigeData.vineyards}
       />
     </>
   );

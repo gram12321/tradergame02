@@ -1,5 +1,4 @@
 import { authService } from './authService';
-import { Season } from '../../types/types';
 import { GAME_INITIALIZATION } from '../../constants/constants';
 import { insertCompany, insertUser, getCompanyById, getCompanyByName, getUserCompanies, getAllCompanies as loadAllCompanies, updateCompany as updateCompanyInDB, deleteCompany as deleteCompanyFromDB, getCompanyStats as loadCompanyStats, checkCompanyNameExists, type Company, type CompanyData } from '@/lib/database';
 import { initializeLenders } from '../finance/lenderService';
@@ -15,8 +14,8 @@ export interface CompanyCreateData {
 }
 
 export interface CompanyUpdateData {
-  currentWeek?: number;
-  currentSeason?: Season;
+  currentDay?: number;    // 1-24 (Day-Month-Year system)
+  currentMonth?: number;  // 1-7
   currentYear?: number;
   money?: number;
   prestige?: number;
@@ -26,20 +25,20 @@ export interface CompanyUpdateData {
   playerShares?: number;
   initialOwnershipPct?: number;
   dividendRate?: number;
-  lastDividendPaidWeek?: number;
-  lastDividendPaidSeason?: Season;
+  lastDividendPaidDay?: number;
+  lastDividendPaidMonth?: number;
   lastDividendPaidYear?: number;
   marketCap?: number;
   sharePrice?: number;
   initialVineyardValue?: number; // Initial family contribution (vineyard value at company creation)
   // Growth trend tracking
   growthTrendMultiplier?: number;
-  lastGrowthTrendUpdateWeek?: number;
-  lastGrowthTrendUpdateSeason?: Season;
+  lastGrowthTrendUpdateDay?: number;
+  lastGrowthTrendUpdateMonth?: number;
   lastGrowthTrendUpdateYear?: number;
   // Incremental share price tracking
-  lastSharePriceUpdateWeek?: number;
-  lastSharePriceUpdateSeason?: Season;
+  lastSharePriceUpdateDay?: number;
+  lastSharePriceUpdateMonth?: number;
   lastSharePriceUpdateYear?: number;
   // Share distribution
   familyShares?: number;
@@ -100,10 +99,10 @@ class CompanyService {
       const companyData: CompanyData = {
         name: data.name,
         user_id: userId,
-        founded_year: 2024,
-        current_week: 1,
-        current_season: 'Spring',
-        current_year: 2024,
+        founded_year: GAME_INITIALIZATION.STARTING_YEAR,
+        current_day: GAME_INITIALIZATION.STARTING_DAY,
+        current_month: GAME_INITIALIZATION.STARTING_MONTH,
+        current_year: GAME_INITIALIZATION.STARTING_YEAR,
         money: 0,
         prestige: GAME_INITIALIZATION.STARTING_PRESTIGE
         // Share fields removed - now in company_shares table

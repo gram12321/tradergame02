@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, Badge, Butto
 import { Trophy, Medal, Lock, Calendar, Coins, Wine, Star } from 'lucide-react';
 import { formatNumber, formatPercent, formatGameDateFromObject } from '@/lib/utils/utils';
 import { PageProps, CompanyProps } from '../../lib/types/UItypes';
-import { getAllAchievementsWithStatus, getAchievementStats } from '@/lib/services';
+import { getAllAchievementsWithStatus, getAchievementStats } from '@/lib/services/user/achievementService';
 import { getAchievementLevelInfo } from '@/lib/services/user/achievementService';
 import { AchievementLevel } from '@/lib/types/types';
 
@@ -12,7 +12,6 @@ interface AchievementsProps extends PageProps, CompanyProps {
   // Inherits currentCompany and onBack from shared interfaces
 }
 
-// Achievement types are now imported from the service layer
 
 export function Achievements({ currentCompany, onBack }: AchievementsProps) {
   const { withLoading } = useLoadingState();

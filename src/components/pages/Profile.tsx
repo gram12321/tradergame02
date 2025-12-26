@@ -62,7 +62,7 @@ export function Profile({ currentCompany, onCompanySelected, onBackToLogin }: Pr
             totalCompanies: 1, 
             totalGold: currentCompany.money, 
             totalValue: currentCompany.money, // For now, simple calculation
-            avgWeeks: Math.max(1, (currentCompany.currentYear - currentCompany.foundedYear) * 52 + currentCompany.currentWeek)
+            avgWeeks: Math.max(1, calculateCompanyWeeks(currentCompany.foundedYear, currentCompany.currentDay, currentCompany.currentMonth, currentCompany.currentYear))
           });
           
           // If the company has a user_id, try to load that user's information
@@ -240,8 +240,8 @@ export function Profile({ currentCompany, onCompanySelected, onBackToLogin }: Pr
           return new Date(b.lastPlayed).getTime() - new Date(a.lastPlayed).getTime();
         case 'age':
           // Calculate weeks elapsed using utility function
-          const aWeeks = calculateCompanyWeeks(a.foundedYear, a.currentWeek, a.currentSeason, a.currentYear);
-          const bWeeks = calculateCompanyWeeks(b.foundedYear, b.currentWeek, b.currentSeason, b.currentYear);
+          const aWeeks = calculateCompanyWeeks(a.foundedYear, a.currentDay, a.currentMonth, a.currentYear);
+          const bWeeks = calculateCompanyWeeks(b.foundedYear, b.currentDay, b.currentMonth, b.currentYear);
           return bWeeks - aWeeks;
         default:
           return 0;
@@ -564,7 +564,7 @@ export function Profile({ currentCompany, onCompanySelected, onBackToLogin }: Pr
                             <div>
                               <h3 className="font-semibold">{company.name}</h3>
                               <p className="text-sm text-muted-foreground">
-                                Week {company.currentWeek}, {company.currentSeason} {company.currentYear}
+                                Day {company.currentDay}, Month {company.currentMonth}, {company.currentYear}
                               </p>
                             </div>
                           </div>

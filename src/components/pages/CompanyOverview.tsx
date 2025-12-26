@@ -4,10 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, Button, Dial
 import { Building2, TrendingUp, Trophy, Calendar, BarChart3, Wine, ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatGameDateFromObject, calculateCompanyWeeks, formatGameDate, formatNumber } from '@/lib/utils/utils';
 import { formatPercent, getColorClass, getGrapeQualityCategory, getWineBalanceCategory, StoryPortrait } from '@/lib/utils';
-import { useGameState, useGameUpdates } from '@/hooks';
+import { useGameState } from '@/hooks';
 import { getCurrentCompany, highscoreService } from '@/lib/services';
 import { type ScoreType } from '@/lib/database';
-import { loadWineBatches } from '@/lib/database/activities/inventoryDB';
 import { NavigationProps } from '../../lib/types/UItypes';
 
 type MentorWelcomeData = {
@@ -42,26 +41,18 @@ const CompanyOverview: React.FC<CompanyOverviewProps> = ({ onNavigate }) => {
   const [mentorWelcome, setMentorWelcome] = useState<MentorWelcomeData | null>(null);
   const [selectedScoreType, setSelectedScoreType] = useState<ScoreType>('company_value');
   const [contextLoading, setContextLoading] = useState(false);
-  const [contextEntries, setContextEntries] = useState<{ entries: any[]; startIndex: number } | null>(null);
-  
-  const [cellarStats, setCellarStats] = useState({
-    totalWineValue: 0,
-    bottledWineCount: 0,
-    bottledBottles: 0,
-    agedWineValue: 0,
-    agedWineCount: 0
-  });
+
 
   const gameDate = {
-    week: gameState.week || 1,
-    season: gameState.season || 'Spring',
+    day: gameState.day || 1,
+    month: gameState.month || 1,
     year: gameState.currentYear || 2024
   };
 
   useEffect(() => {
     if (company) {
       loadCompanyRankings();
-      loadCellarStats();
+
     }
   }, [company?.id]);
   
@@ -91,14 +82,7 @@ const CompanyOverview: React.FC<CompanyOverviewProps> = ({ onNavigate }) => {
     }
   }, []);
 
-  // Reactive update for cellar stats when game state changes
-  const { subscribe } = useGameUpdates();
-  useEffect(() => {
-    const unsubscribe = subscribe(() => {
-      loadCellarStats();
-    });
-    return () => { unsubscribe(); };
-  }, [subscribe]);
+
 
   const loadCompanyRankings = () => withLoading(async () => {
     if (!company) return;
@@ -115,31 +99,11 @@ const CompanyOverview: React.FC<CompanyOverviewProps> = ({ onNavigate }) => {
     setContextLoading(false);
   }, [company]);
   
-  const loadCellarStats = async () => {
-    try {
-      const batches = await loadWineBatches();
-      const bottledWines = batches.filter(b => b.state === 'bottled');
-      const agedWines = bottledWines.filter(b => (b.agingProgress || 0) >= 260); // 5+ years
-      
-      const totalWineValue = bottledWines.reduce((sum, b) => sum + (b.quantity * b.estimatedPrice), 0);
-      const bottledBottles = bottledWines.reduce((sum, b) => sum + b.quantity, 0);
-      const agedWineValue = agedWines.reduce((sum, b) => sum + (b.quantity * b.estimatedPrice), 0);
-      
-      setCellarStats({
-        totalWineValue,
-        bottledWineCount: bottledWines.length,
-        bottledBottles,
-        agedWineValue,
-        agedWineCount: agedWines.length
-      });
-    } catch (error) {
-      console.error('Error loading cellar stats:', error);
-    }
-  };
+  
 
   const formatCompanyGameDate = useCallback(() => {
     if (!company) return formatGameDateFromObject(gameDate);
-    return formatGameDate(company.currentWeek, company.currentSeason, company.currentYear);
+    return formatGameDate(company.currentDay, company.currentMonth, company.currentYear);
   }, [company, gameDate]);
 
   const formatRanking = useCallback((ranking: { position: number; total: number }): string => {
@@ -257,7 +221,7 @@ const CompanyOverview: React.FC<CompanyOverviewProps> = ({ onNavigate }) => {
 
   // Calculate some basic stats using utility functions - memoized for performance
   const { weeksElapsed, avgMoneyPerWeek, companyAge } = useMemo(() => {
-    const weeks = company ? calculateCompanyWeeks(company.foundedYear, company.currentWeek, company.currentSeason, company.currentYear) : 1;
+    const weeks = company ? calculateCompanyWeeks(company.foundedYear, company.currentDay, company.currentMonth, company.currentYear) : 1;
     const avgMoney = (gameState.money || 0) / weeks;
     const age = `${formatNumber(Math.floor(weeks / 52), { decimals: 0, forceDecimals: true })} years, ${formatNumber(weeks % 52, { decimals: 0, forceDecimals: true })} weeks`;
     return { weeksElapsed: weeks, avgMoneyPerWeek: avgMoney, companyAge: age };

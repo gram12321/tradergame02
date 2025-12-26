@@ -1,5 +1,4 @@
 import { supabase } from './supabase';
-import { Season } from '../../types/types';
 import { toOptionalString } from '../dbMapperUtils';
 
 const COMPANIES_TABLE = 'companies';
@@ -9,8 +8,8 @@ export interface Company {
   name: string;
   userId?: string;
   foundedYear: number;
-  currentWeek: number;
-  currentSeason: Season;
+  currentDay: number;    // 1-24 (Day-Month-Year system)
+  currentMonth: number;  // 1-7
   currentYear: number;
   money: number;
   prestige: number;
@@ -33,8 +32,8 @@ async function mapCompanyFromDB(dbCompany: any): Promise<Company> {
     name: dbCompany.name,
     userId: dbCompany.user_id,
     foundedYear: dbCompany.founded_year,
-    currentWeek: dbCompany.current_week,
-    currentSeason: dbCompany.current_season as Season,
+    currentDay: dbCompany.current_day,
+    currentMonth: dbCompany.current_month,
     currentYear: dbCompany.current_year,
     money: dbCompany.money,
     prestige: dbCompany.prestige,
@@ -60,8 +59,8 @@ export interface CompanyData {
   name: string;
   user_id?: string | null;
   founded_year: number;
-  current_week: number;
-  current_season: Season;
+  current_day: number;    // 1-24 (Day-Month-Year system)
+  current_month: number;  // 1-7
   current_year: number;
   money: number;
   prestige: number;

@@ -4,7 +4,8 @@ import { Customer, WineCharacteristics } from '../types/types';
 import { calculateRelationshipBreakdown, formatRelationshipBreakdown } from '../services/sales/relationshipService';
 import { BASE_BALANCED_RANGES } from '../constants/grapeConstants';
 import { Normalize1000To01WithTail } from './calculator';
-import { SEASON_ORDER, WEEKS_PER_SEASON, WEEKS_PER_YEAR } from '@/lib/constants';
+import { DAYS_PER_MONTH, MONTHS_PER_YEAR } from '@/lib/constants/timeConstants';
+import { GAME_INITIALIZATION } from '@/lib/constants';
 
 export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs));
@@ -295,19 +296,19 @@ export function formatDate(date: Date, includeTime: boolean = false): string {
  * 
  * @example formatGameDate(3, 'Summer', 2024) // "Week 3, Summer 2024"
  */
-export function formatGameDate(week?: number, season?: string, year?: number): string {
-  const weekNum = week || 1;
-  const seasonName = season || 'Spring';
+export function formatGameDate(day?: number, month?: number, year?: number): string {
+  const dayNum = day || 1;
+  const monthNum = month || 1;
   const yearNum = year || 2024;
   
-  return `Week ${weekNum}, ${seasonName} ${yearNum}`;
+  return `Day ${dayNum}, Month ${monthNum}, ${yearNum}`;
 }
 
 /**
  * Format game date object as a readable string
  */
-export function formatGameDateFromObject(gameDate: { week: number; season: string; year: number }): string {
-  return formatGameDate(gameDate.week, gameDate.season, gameDate.year);
+export function formatGameDateFromObject(gameDate: { day: number; month: number; year: number }): string {
+  return formatGameDate(gameDate.day, gameDate.month, gameDate.year);
 }
 
 // ========================================
@@ -315,60 +316,62 @@ export function formatGameDateFromObject(gameDate: { week: number; season: strin
 // ========================================
 
 /**
- * Calculate absolute weeks from game start (2024, Week 1)
+ * Calculate absolute days from game start (2024, Day 1, Month 1)
  * Used for calculating game progression and time-based effects
+ * Note: Function name kept as "Weeks" for backward compatibility, but now calculates days
  * 
- * @param currentWeek Current week number
- * @param currentSeason Current season
+ * @param currentDay Current day number (1-24)
+ * @param currentMonth Current month number (1-7)
  * @param currentYear Current year
- * @param startWeek Starting week (default: 1)
- * @param startSeason Starting season (default: 'Spring')
+ * @param startDay Starting day (default: 1)
+ * @param startMonth Starting month (default: 1)
  * @param startYear Starting year (default: 2024)
- * @returns Total weeks elapsed
+ * @returns Total days elapsed
  */
 export function calculateAbsoluteWeeks(
-  currentWeek: number,
-  currentSeason: string,
+  currentDay: number,
+  currentMonth: number,
   currentYear: number,
-  startWeek: number = 1,
-  startSeason: string = 'Spring',
+  startDay: number = 1,
+  startMonth: number = 1,
   startYear: number = 2024
 ): number {
-  const startSeasonIndex = SEASON_ORDER.indexOf(startSeason as typeof SEASON_ORDER[number]);
-  const currentSeasonIndex = SEASON_ORDER.indexOf(currentSeason as typeof SEASON_ORDER[number]);
+  const startAbsoluteDays =
+    (startYear - GAME_INITIALIZATION.STARTING_YEAR) * (DAYS_PER_MONTH * MONTHS_PER_YEAR) +
+    (startMonth - 1) * DAYS_PER_MONTH +
+    (startDay - 1);
 
-  const safeStartSeasonIndex = startSeasonIndex >= 0 ? startSeasonIndex : 0;
-  const safeCurrentSeasonIndex = currentSeasonIndex >= 0 ? currentSeasonIndex : 0;
+  const currentAbsoluteDays =
+    (currentYear - GAME_INITIALIZATION.STARTING_YEAR) * (DAYS_PER_MONTH * MONTHS_PER_YEAR) +
+    (currentMonth - 1) * DAYS_PER_MONTH +
+    (currentDay - 1);
 
-  const startAbsoluteWeeks =
-    (startYear - 2024) * WEEKS_PER_YEAR +
-    safeStartSeasonIndex * WEEKS_PER_SEASON +
-    (startWeek - 1);
-
-  const currentAbsoluteWeeks =
-    (currentYear - 2024) * WEEKS_PER_YEAR +
-    safeCurrentSeasonIndex * WEEKS_PER_SEASON +
-    (currentWeek - 1);
-
-  return Math.max(1, currentAbsoluteWeeks - startAbsoluteWeeks + 1);
+  return Math.max(1, currentAbsoluteDays - startAbsoluteDays + 1);
 }
 
 /**
- * Calculate weeks elapsed for a company since founding
+ * Calculate days elapsed for a company since founding
  * 
  * @param foundedYear Year the company was founded
- * @param currentWeek Current week number
- * @param currentSeason Current season
+ * @param currentDay Current day number
+ * @param currentMonth Current month number
  * @param currentYear Current year
- * @returns Weeks elapsed since founding
+ * @returns Days elapsed since founding
  */
 export function calculateCompanyWeeks(
   foundedYear: number,
-  currentWeek: number,
-  currentSeason: string,
+  currentDay: number,
+  currentMonth: number,
   currentYear: number
 ): number {
-  return calculateAbsoluteWeeks(currentWeek, currentSeason, currentYear, 1, 'Spring', foundedYear);
+  const { DAYS_PER_MONTH, MONTHS_PER_YEAR } = require('../constants/timeConstants');
+  const startDays = (foundedYear - GAME_INITIALIZATION.STARTING_YEAR) * (DAYS_PER_MONTH * MONTHS_PER_YEAR) +
+                    (1 - 1) * DAYS_PER_MONTH +
+                    (1 - 1);
+  const currentDays = (currentYear - GAME_INITIALIZATION.STARTING_YEAR) * (DAYS_PER_MONTH * MONTHS_PER_YEAR) +
+                      (currentMonth - 1) * DAYS_PER_MONTH +
+                      (currentDay - 1);
+  return Math.max(1, currentDays - startDays + 1);
 }
 
 // ========================================

@@ -7,9 +7,9 @@ export const GAME_INITIALIZATION = {
   // Starting financial capital (amount added as transaction)
   STARTING_MONEY: 100000, // €100k starting capital transaction
   
-  // Starting time
-  STARTING_WEEK: 1,
-  STARTING_SEASON: 'Spring' as const,
+  // Starting time (Day-Month-Year system)
+  STARTING_DAY: 1,
+  STARTING_MONTH: 1,
   STARTING_YEAR: 2024,
   
   // Starting prestige

@@ -2,16 +2,16 @@ import { formatNumber, getColorClass } from '@/lib/utils';
 import { calculateFinancialData, calculateCompanyValue } from '@/lib/services';
 import { SimpleCard } from '../ui';
 import { useGameStateWithData } from '@/hooks';
-import { DEFAULT_FINANCIAL_DATA, FINANCE_PERIOD_LABELS, WEEKS_PER_SEASON } from '@/lib/constants';
+import { DEFAULT_FINANCIAL_DATA, FINANCE_PERIOD_LABELS } from '@/lib/constants/financeConstants';
+import { MONTHS_PER_YEAR } from '@/lib/constants/timeConstants';
 import { loadActiveLoans } from '@/lib/database/core/loansDB';
 import { useState, useEffect } from 'react';
 import { Loan } from '@/lib/types/types';
 
 interface IncomeBalanceViewProps {
-  period: 'weekly' | 'season' | 'year' | 'all';
+  period: 'monthly' | 'yearly' | 'all';
   filters: {
-    week?: number;
-    season?: string;
+    month?: number;
     year?: number;
   };
 }
@@ -42,7 +42,11 @@ export function IncomeBalanceView({ period, filters }: IncomeBalanceViewProps) {
   const [activeLoans, setActiveLoans] = useState<Loan[]>([]);
   const [loadingLoans, setLoadingLoans] = useState(true);
 
-  const periodLabels = FINANCE_PERIOD_LABELS[period] ?? FINANCE_PERIOD_LABELS.weekly;
+  const periodLabels = period === 'monthly' 
+    ? { income: 'MONTHLY INCOME', expenses: 'MONTHLY EXPENSES' }
+    : period === 'yearly'
+    ? { income: 'YEARLY INCOME', expenses: 'YEARLY EXPENSES' }
+    : FINANCE_PERIOD_LABELS.all;
   const periodLabel = period === 'all' ? 'All Time' : `${period.charAt(0).toUpperCase() + period.slice(1)}`;
   const showLoanPaymentBreakdown = period !== 'all';
 
@@ -73,13 +77,12 @@ export function IncomeBalanceView({ period, filters }: IncomeBalanceViewProps) {
   const totalOutstandingLoans = activeLoans.reduce((sum, loan) => sum + loan.remainingBalance, 0);
   
   // Calculate period-appropriate payment amounts
+  // Note: Loans still use seasonal payment structure, but we'll convert for display
   const getPeriodPaymentAmount = (seasonalPayment: number) => {
     switch (period) {
-      case 'weekly':
-        return seasonalPayment / WEEKS_PER_SEASON;
-      case 'season':
-        return seasonalPayment;
-      case 'year':
+      case 'monthly':
+        return seasonalPayment / 3; // Approximate: 3 months per season equivalent
+      case 'yearly':
         return seasonalPayment * 4; // 4 seasons per year
       case 'all':
         return seasonalPayment * 4;
@@ -257,14 +260,14 @@ export function IncomeBalanceView({ period, filters }: IncomeBalanceViewProps) {
           
           <FinancialSection title="FIXED ASSETS">
             <DataRow label="Buildings" value={financialData.buildingsValue} />
-            <DataRow label="Vineyards" value={financialData.allVineyardsValue} />
+            <DataRow label="Property Assets" value={financialData.allVineyardsValue} />
             <hr className="my-1 border-gray-300" />
             <DataRow label="Total Fixed Assets" value={financialData.fixedAssets} />
           </FinancialSection>
 
-          <FinancialSection title="CURRENT ASSETS (WINE)">
-            <DataRow label="Wine Inventory" value={financialData.wineValue} />
-            <DataRow label="Grape Inventory" value={financialData.grapesValue} />
+          <FinancialSection title="CURRENT ASSETS">
+            <DataRow label="Inventory" value={financialData.wineValue} />
+            <DataRow label="Raw Materials" value={financialData.grapesValue} />
             <hr className="my-1 border-gray-300" />
             <DataRow label="Total Current Assets" value={financialData.currentAssets} />
           </FinancialSection>
@@ -311,7 +314,7 @@ export function IncomeBalanceView({ period, filters }: IncomeBalanceViewProps) {
               <div className="text-xs font-medium text-gray-600 mb-1">Contributed Capital</div>
               <div className="ml-2 space-y-1">
                 <DataRow label="Player Contribution (Cash)" value={financialData.playerContribution} valueClass="text-blue-600" />
-                <DataRow label="Family Contribution (Vineyards)" value={financialData.familyContribution} valueClass="text-blue-600" />
+                <DataRow label="Family Contribution (Assets)" value={financialData.familyContribution} valueClass="text-blue-600" />
                 <DataRow label="Public Investment (Cash)" value={financialData.outsideInvestment} valueClass="text-blue-600" />
               </div>
               <div className="ml-2 mt-1 pt-1 border-t border-gray-200">

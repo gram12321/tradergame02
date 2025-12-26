@@ -728,8 +728,8 @@ async function spawnAchievementPrestigeEvents(
   
   const gameState = getGameState();
   const currentWeek = calculateAbsoluteWeeks(
-    gameState.week!, 
-    gameState.season!, 
+    gameState.day!, 
+    gameState.month!, 
     gameState.currentYear!
   );
   
@@ -827,8 +827,8 @@ async function unlockAchievementWithPrestige(
 ): Promise<AchievementUnlock> {
   const gameState = getGameState();
   const currentWeek = calculateAbsoluteWeeks(
-    gameState.week!, 
-    gameState.season!, 
+    gameState.day!, 
+    gameState.month!, 
     gameState.currentYear!
   );
   

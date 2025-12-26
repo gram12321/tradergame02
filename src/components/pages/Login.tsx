@@ -458,7 +458,7 @@ export function Login({ onCompanySelected }: LoginProps) {
                               >
                                 <h4 className="font-medium">{company.name}</h4>
                                 <p className="text-xs text-muted-foreground">
-                                  Week {company.currentWeek}, {company.currentSeason} {company.currentYear}
+                                  Day {company.currentDay}, Month {company.currentMonth}, {company.currentYear}
                                 </p>
                                 <p className="text-xs">
                                   {formatNumber(company.money, { currency: true, decimals: 0 })}
@@ -504,7 +504,7 @@ export function Login({ onCompanySelected }: LoginProps) {
                               >
                                 <h4 className="font-medium">{company.name}</h4>
                                 <p className="text-xs text-muted-foreground">
-                                  Week {company.currentWeek}, {company.currentSeason} {company.currentYear}
+                                  Day {company.currentDay}, Month {company.currentMonth}, {company.currentYear}
                                 </p>
                                 <p className="text-xs">
                                   {formatNumber(company.money, { currency: true, decimals: 0 })}

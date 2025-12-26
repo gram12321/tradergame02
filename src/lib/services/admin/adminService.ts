@@ -2,9 +2,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '../../database/core/supabase';
 import { addTransaction, getCurrentPrestige, clearPrestigeCache, getGameState, highscoreService, initializeCustomers, updateGameState } from '../index';
 import { insertPrestigeEvent } from '../../database';
-import { calculateAbsoluteWeeks, formatNumber } from '@/lib/utils';
-import { GAME_INITIALIZATION, SEASONS, WEEKS_PER_SEASON } from '@/lib/constants';
-import type { Season } from '@/lib/types/types';
+import { formatNumber } from '@/lib/utils';
+import { GAME_INITIALIZATION } from '@/lib/constants';
 import { RESEARCH_PROJECTS } from '@/lib/constants/researchConstants';
 import { unlockResearch, getAllResearchUnlocks } from '@/lib/database';
 import { getCurrentCompanyId } from '@/lib/utils/companyUtils';
@@ -13,88 +12,7 @@ import { setPlayerBalance } from '../user/userBalanceService';
 import { getCurrentCompany } from '../core/gameState';
 import { companyService } from '../user/companyService';
 
-import { awardExperience, getAllStaff } from '../user/staffService';
-
-
 // ===== ADMIN BUSINESS LOGIC FUNCTIONS =====
-
-/**
- * Admin function to set staff XP for a specific skill category
- * @param staffId - ID of the staff member
- * @param category - XP category (e.g., 'skill:field', 'grape:Chardonnay')
- * @param amount - Amount of XP to set (replaces current value)
- */
-export async function adminSetStaffXP(
-  staffId: string,
-  category: string,
-  amount: number
-): Promise<{ success: boolean; message?: string; error?: string }> {
-  try {
-    const allStaff = await getAllStaff();
-    const staff = allStaff.find(s => s.id === staffId);
-
-    if (!staff) {
-      return {
-        success: false,
-        error: 'Staff member not found'
-      };
-    }
-
-    const currentXP = staff.experience?.[category] || 0;
-    const difference = amount - currentXP;
-
-    // Use awardExperience to set the XP (by awarding the difference)
-    await awardExperience(staffId, difference, [category]);
-
-    return {
-      success: true,
-      message: `Set ${category} XP to ${amount} for ${staff.name}`
-    };
-  } catch (error) {
-    console.error('Error setting staff XP:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    };
-  }
-}
-
-/**
- * Admin function to add XP to a staff member (doesn't replace, adds to current)
- * @param staffId - ID of the staff member
- * @param category - XP category (e.g., 'skill:field', 'grape:Chardonnay')
- * @param amount - Amount of XP to add
- */
-export async function adminAddStaffXP(
-  staffId: string,
-  category: string,
-  amount: number
-): Promise<{ success: boolean; message?: string; error?: string }> {
-  try {
-    const allStaff = await getAllStaff();
-    const staff = allStaff.find(s => s.id === staffId);
-
-    if (!staff) {
-      return {
-        success: false,
-        error: 'Staff member not found'
-      };
-    }
-
-    await awardExperience(staffId, amount, [category]);
-
-    return {
-      success: true,
-      message: `Added ${amount} XP to ${category} for ${staff.name}`
-    };
-  } catch (error) {
-    console.error('Error adding staff XP:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    };
-  }
-}
 
 
 /**
@@ -170,18 +88,18 @@ export async function adminAddPrestigeToCompany(amount: number): Promise<void> {
 
   try {
     const gameState = getGameState();
-    const currentWeek = calculateAbsoluteWeeks(
-      gameState.week!,
-      gameState.season!,
-      gameState.currentYear!
-    );
+    const { DAYS_PER_MONTH, MONTHS_PER_YEAR } = await import('../../constants/timeConstants');
+    // Calculate absolute day number for timestamp
+    const currentDay = (gameState.currentYear! - GAME_INITIALIZATION.STARTING_YEAR) * (DAYS_PER_MONTH * MONTHS_PER_YEAR) +
+                       (gameState.month! - 1) * DAYS_PER_MONTH +
+                       (gameState.day! - 1);
 
     // Add prestige event using the proper service layer
     await insertPrestigeEvent({
       id: uuidv4(),
       type: 'admin_cheat' as any,
       amount_base: parsedAmount,
-      created_game_week: currentWeek,
+      created_game_week: currentDay, // Using day number instead of week
       decay_rate: 0, // Admin prestige doesn't decay
       source_id: null,
       payload: {
@@ -428,28 +346,32 @@ export async function adminClearAllAchievements(): Promise<void> {
 }
 
 interface AdminGameDatePayload {
-  week: number;
-  season: Season;
+  day: number;
+  month: number;
   year: number;
 }
 
 /**
- * Set the game date (week, season, year) for the active company
+ * Set the game date (day, month, year) for the active company
  */
-export async function adminSetGameDate({ week, season, year }: AdminGameDatePayload): Promise<void> {
-  const normalizedWeek = Number.isFinite(week)
-    ? Math.min(Math.max(Math.floor(week), 1), WEEKS_PER_SEASON)
-    : GAME_INITIALIZATION.STARTING_WEEK;
+export async function adminSetGameDate({ day, month, year }: AdminGameDatePayload): Promise<void> {
+  const { DAYS_PER_MONTH, MONTHS_PER_YEAR } = await import('../../constants/timeConstants');
+  
+  const normalizedDay = Number.isFinite(day)
+    ? Math.min(Math.max(Math.floor(day), 1), DAYS_PER_MONTH)
+    : GAME_INITIALIZATION.STARTING_DAY;
 
-  const normalizedSeason = SEASONS.includes(season) ? season : GAME_INITIALIZATION.STARTING_SEASON;
+  const normalizedMonth = Number.isFinite(month)
+    ? Math.min(Math.max(Math.floor(month), 1), MONTHS_PER_YEAR)
+    : GAME_INITIALIZATION.STARTING_MONTH;
 
   const normalizedYear = Number.isFinite(year)
     ? Math.max(Math.floor(year), GAME_INITIALIZATION.STARTING_YEAR)
     : GAME_INITIALIZATION.STARTING_YEAR;
 
   await updateGameState({
-    week: normalizedWeek,
-    season: normalizedSeason,
+    day: normalizedDay,
+    month: normalizedMonth,
     currentYear: normalizedYear
   });
 }
@@ -466,16 +388,16 @@ export async function adminGrantAllResearch(): Promise<{ success: boolean; unloc
 
     const gameState = getGameState();
     const gameDate: GameDate = {
-      week: gameState.week || GAME_INITIALIZATION.STARTING_WEEK,
-      season: (gameState.season || GAME_INITIALIZATION.STARTING_SEASON) as any,
+      day: gameState.day || GAME_INITIALIZATION.STARTING_DAY,
+      month: gameState.month || GAME_INITIALIZATION.STARTING_MONTH,
       year: gameState.currentYear || GAME_INITIALIZATION.STARTING_YEAR
     };
 
-    const absoluteWeeks = calculateAbsoluteWeeks(
-      gameDate.week,
-      gameDate.season,
-      gameDate.year
-    );
+    // Calculate absolute day number for timestamp
+    const { DAYS_PER_MONTH, MONTHS_PER_YEAR } = await import('../../constants/timeConstants');
+    const absoluteDays = (gameDate.year - GAME_INITIALIZATION.STARTING_YEAR) * (DAYS_PER_MONTH * MONTHS_PER_YEAR) +
+                         (gameDate.month - 1) * DAYS_PER_MONTH +
+                         (gameDate.day - 1);
 
     // Get currently unlocked research IDs
     const existingUnlocks = await getAllResearchUnlocks(companyId);
@@ -496,7 +418,7 @@ export async function adminGrantAllResearch(): Promise<{ success: boolean; unloc
           researchId: project.id,
           companyId,
           unlockedAt: gameDate,
-          unlockedAtTimestamp: absoluteWeeks,
+          unlockedAtTimestamp: absoluteDays,
           metadata: {
             unlocks: project.unlocks || [],
             adminGranted: true

@@ -1,9 +1,5 @@
 # Trader Game V 0.2
-
 **Local path**: C:\Users\krist\Documents\GitHub\tradergame02
-
-
-# General AI Rules
 A multiplayer web-based trading game built with React, TypeScript, and Supabase, Vercel for production env.
 
 ## Project Overview
@@ -61,20 +57,16 @@ return (
 
 ### 🧠 Development Patterns
 
-**CRITICAL RULES FOR AI AGENTS:**
-- **NEVER make any effort for backwards compability, database save, data migration or anything like that. We are in dev phase. Database will simply be deleted if any compability issue arrice**:
-- **ALWAYS use barrel exports**: `@/components/ui`, `@/hooks`, `@/lib/services`, `@/lib/utils`, `@/lib/constants`
-- **ALWAYS use custom hooks**: `useLoadingState()`, `useGameStateWithData()`, `useGameState()`, `useGameUpdates()`, `usePrestigeUpdates()`, , `useFormattedBalance()`, `useTableSortWithAccessors()`
-- **ALWAYS use shared interfaces**: `PageProps`, `NavigationProps`, `CompanyProps`, `DialogProps`, `FormProps`, `TableProps`, `LoadingProps`, `CardProps`, `BaseComponentProps` from `@/components/UItypes`
-- **ALWAYS use service exports**: Game state (`getGameState`, `updateGameState`, `getCurrentCompany`, `getCurrentPrestige`), Finance (`addTransaction`, `loadTransactions`, `calculateFinancialData`), 
-- **ALWAYS use utility exports**: Formatting (`formatNumber`, `formatCurrency`, `formatDate`, `formatGameDate`, `formatPercent`), Calculations (`calculateSkewedMultiplier`, `calculateAsymmetricalMultiplier`, `calculateBaseWinePrice`), Company utils (`getCurrentCompanyId`, `getCompanyQuery`), Wine utilities (`getGrapeQualityCategory`, `getColorClass`, `getBadgeColorClasses`)
-- **Business logic in services**: Never put calculations in components
-- **Reactive updates**: Services trigger global updates, components auto-refresh
+**Note:** AI coding rules and conventions are defined in `.cursor/rules/ai-projectrules.mdc`. This section documents the patterns used in the codebase.
+
+**Key Patterns:**
+- Barrel exports for clean imports (`@/components/ui`, `@/hooks`, `@/lib/services`, `@/lib/utils`, `@/lib/constants`)
+- Custom hooks for state management and utilities
+- Shared interfaces from `@/components/UItypes` for type consistency
+- Service layer for business logic (never calculations in components)
+- Reactive updates: Services trigger global updates, components auto-refresh
 
 ### 🪜 Starting Conditions & Financial Options
-
-
-
 
 ### Facility System
 
@@ -113,7 +105,7 @@ return (
 - Supabase project: `uuribntaigecwtkdxeyw`
 - Environment: `.env.local` (gitignored)
 - Management: MCP tools (`mcp_supabase-dev_*`) for agentic operations
-- Usage: `localhost:3000` with frequent resets
+- Usage: `localhost:5173` with frequent resets
 
 **Vercel Database (Staging):**
 - Supabase project: `uuzoeoukixvunbnkrowi`
@@ -149,12 +141,7 @@ return (
 
 ## Core Game Systems & Features
 
-### 1. Wine Production System ✅ **IMPLEMENTED**
-
-**Implemented (Advanced System):**
-
-
-### 3. Staff System ✅ **NOT IMPLEMENTED**
+### 3. Staff System **NOT IMPLEMENTED**
 - **Staff Management**: Hire and fire staff with nationality, skill levels, and specializations
 - **Skill System**: 5 core skills (Field, Winery, Administration, Sales, Maintenance)
 - **Work Calculation**: Dynamic work progression based on assigned staff skills

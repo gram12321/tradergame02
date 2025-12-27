@@ -1,14 +1,12 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useLoadingState } from '@/hooks';
-import { Button, Input, Label, Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter, Badge, Tabs, TabsContent, TabsList, TabsTrigger, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, UnifiedTooltip } from '../ui';
-import { User, Building2, Edit, Trash2, RefreshCw, BarChart3 } from 'lucide-react';
+import { Button, Input, Label, Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter, Tabs, TabsContent, TabsList, TabsTrigger, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../ui';
+import { User, Building2, Edit, Trash2 } from 'lucide-react';
 import { authService, companyService } from '@/lib/services';
 import { type AuthUser, type Company, supabase, updateUser, deleteUser } from '@/lib/database';
-import type { CompanyStats } from '@/lib/services';
-import { formatNumber, calculateCompanyWeeks, formatDate } from '@/lib/utils/utils';
+import { formatNumber, formatDate } from '@/lib/utils/utils';
 import { AVATAR_OPTIONS } from '@/lib/utils/icons';
 import { PageProps, CompanyProps } from '../../lib/types/UItypes';
-import { getPlayerBalance } from '@/lib/services/user/userBalanceService';
 
 // Color options
 const COLOR_OPTIONS = [
@@ -31,9 +29,7 @@ export function Profile({ currentCompany, onCompanySelected, onBackToLogin }: Pr
   // State
   const { isLoading, withLoading } = useLoadingState();
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
-  const [userCompanies, setUserCompanies] = useState<Company[]>([]);
-  const [companyStats, setCompanyStats] = useState<CompanyStats>({ totalCompanies: 0, totalGold: 0, totalValue: 0, avgWeeks: 0 });
-  const [playerBalance, setPlayerBalance] = useState<number>(0);
+  const [userCompany, setUserCompany] = useState<Company | null>(null);
   const [error, setError] = useState('');
 
   // Edit profile state
@@ -42,8 +38,6 @@ export function Profile({ currentCompany, onCompanySelected, onBackToLogin }: Pr
   const [selectedAvatar, setSelectedAvatar] = useState('default');
   const [selectedColor, setSelectedColor] = useState('blue');
 
-  // Sorting
-  const [sortOption, setSortOption] = useState<'name' | 'money' | 'lastPlayed' | 'age'>('name');
 
   useEffect(() => {
     // Listen for auth changes
@@ -57,21 +51,13 @@ export function Profile({ currentCompany, onCompanySelected, onBackToLogin }: Pr
       } else {
         // If no authenticated user but there's a current company, show it
         if (currentCompany) {
-          setUserCompanies([currentCompany]);
-          setCompanyStats({ 
-            totalCompanies: 1, 
-            totalGold: currentCompany.money, 
-            totalValue: currentCompany.money, // For now, simple calculation
-            avgWeeks: Math.max(1, calculateCompanyWeeks(currentCompany.foundedYear, currentCompany.currentDay, currentCompany.currentMonth, currentCompany.currentYear))
-          });
-          
+          setUserCompany(currentCompany);
           // If the company has a user_id, try to load that user's information
           if (currentCompany.userId) {
             loadCompanyUserData(currentCompany.userId);
           }
         } else {
-          setUserCompanies([]);
-          setCompanyStats({ totalCompanies: 0, totalGold: 0, totalValue: 0, avgWeeks: 0 });
+          setUserCompany(null);
         }
       }
     });
@@ -80,15 +66,9 @@ export function Profile({ currentCompany, onCompanySelected, onBackToLogin }: Pr
   }, [currentCompany]);
 
   const loadUserData = (userId: string) => withLoading(async () => {
-    const [companies, stats, balance] = await Promise.all([
-      companyService.getUserCompanies(userId),
-      companyService.getCompanyStats(userId),
-      getPlayerBalance(userId)
-    ]);
-    
-    setUserCompanies(companies);
-    setCompanyStats(stats);
-    setPlayerBalance(balance);
+    // 1:1 relationship - each user has exactly one company
+    const company = await companyService.getUserCompany(userId);
+    setUserCompany(company);
   });
 
   const loadCompanyUserData = async (userId: string) => {
@@ -122,21 +102,11 @@ export function Profile({ currentCompany, onCompanySelected, onBackToLogin }: Pr
         setSelectedAvatar(user.avatar || 'default');
         setSelectedColor(user.avatar_color || 'blue');
         
-        // Load player balance
-        const balance = await getPlayerBalance(userId);
-        setPlayerBalance(balance);
-        
         // Load all companies for this user
         await loadUserData(userId);
       }
     } catch (error) {
       console.error('Error loading company user data:', error);
-    }
-  };
-
-  const handleRefresh = () => {
-    if (currentUser) {
-      loadUserData(currentUser.id);
     }
   };
 
@@ -208,46 +178,11 @@ export function Profile({ currentCompany, onCompanySelected, onBackToLogin }: Pr
     }
   });
 
-  const formatLastPlayed = useCallback((date: Date): string => {
-    // Handle invalid dates
-    if (!date || isNaN(date.getTime())) {
-      return 'Unknown';
-    }
-    
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays} days ago`;
-    
-    return date.toLocaleDateString();
-  }, []);
 
   const getColorClass = (colorId: string) => {
     return COLOR_OPTIONS.find(c => c.id === colorId)?.value || COLOR_OPTIONS[0].value;
   };
 
-  const getSortedCompanies = useMemo(() => {
-    return [...userCompanies].sort((a, b) => {
-      switch (sortOption) {
-        case 'name':
-          return a.name.localeCompare(b.name);
-        case 'money':
-          return b.money - a.money;
-        case 'lastPlayed':
-          return new Date(b.lastPlayed).getTime() - new Date(a.lastPlayed).getTime();
-        case 'age':
-          // Calculate weeks elapsed using utility function
-          const aWeeks = calculateCompanyWeeks(a.foundedYear, a.currentDay, a.currentMonth, a.currentYear);
-          const bWeeks = calculateCompanyWeeks(b.foundedYear, b.currentDay, b.currentMonth, b.currentYear);
-          return bWeeks - aWeeks;
-        default:
-          return 0;
-      }
-    });
-  }, [userCompanies, sortOption]);
 
   if (!currentUser && !currentCompany) {
     return (
@@ -428,172 +363,43 @@ export function Profile({ currentCompany, onCompanySelected, onBackToLogin }: Pr
               )}
             </Card>
 
-            {/* Portfolio Stats */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
-                  Portfolio Stats
-                </CardTitle>
-                <CardDescription>Combined statistics for all your companies</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <Card className="bg-primary/5">
-                    <CardContent className="p-4 text-center">
-                      <p className="text-xs text-muted-foreground mb-1">Companies</p>
-                      <p className="text-xl font-semibold">{companyStats.totalCompanies}</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-primary/5">
-                    <CardContent className="p-4 text-center">
-                      <p className="text-xs text-muted-foreground mb-1">Avg. Week</p>
-                      <p className="text-xl font-semibold">{companyStats.avgWeeks}</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-primary/5">
-                    <CardContent className="p-4 text-center">
-                      <p className="text-xs text-muted-foreground mb-1">Total Money</p>
-                      <p className="text-xl font-semibold">{formatNumber(companyStats.totalGold, { currency: true, decimals: 0, compact: companyStats.totalGold >= 1000 })}</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-primary/5">
-                    <CardContent className="p-4 text-center">
-                      <p className="text-xs text-muted-foreground mb-1">Total Value</p>
-                      <p className="text-xl font-semibold">{formatNumber(companyStats.totalValue, { currency: true, decimals: 0, compact: companyStats.totalValue >= 1000 })}</p>
-                    </CardContent>
-                  </Card>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Player Balance */}
-            {currentUser && (
+            {/* Company Info */}
+            {userCompany && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <User className="h-5 w-5" />
-                    Player Balance
+                    <Building2 className="h-5 w-5" />
+                    Your Company
                   </CardTitle>
-                  <CardDescription>Your personal cash balance for company investments</CardDescription>
+                  <CardDescription>Company information (1:1 relationship)</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-center">
-                    <p className="text-3xl font-bold text-green-600">
-                      {formatNumber(playerBalance, { currency: true, decimals: 0 })}
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Available for new company investments
-                    </p>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Company Name</p>
+                      <p className="text-lg font-semibold">{userCompany.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Money</p>
+                      <p className="text-lg font-semibold">{formatNumber(userCompany.money, { currency: true, decimals: 0 })}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Game Date</p>
+                      <p className="text-lg font-semibold">Day {userCompany.currentDay}, Month {userCompany.currentMonth}, {userCompany.currentYear}</p>
+                    </div>
+                    {userCompany.id !== currentCompany?.id && (
+                      <Button 
+                        onClick={() => handleSelectCompany(userCompany)}
+                        className="w-full"
+                      >
+                        Switch to This Company
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
             )}
           </div>
-
-          {/* Companies List */}
-          <Card className="lg:col-span-2">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5" />
-                  Your Companies
-                </CardTitle>
-                <CardDescription>Click on a company to switch to it</CardDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                <Select
-                  value={sortOption}
-                  onValueChange={(value: any) => setSortOption(value)}
-                >
-                  <SelectTrigger className="w-[160px]">
-                    <SelectValue placeholder="Sort by" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="name">Name</SelectItem>
-                    <SelectItem value="age">Age (Weeks)</SelectItem>
-                    <SelectItem value="money">Money</SelectItem>
-                    <SelectItem value="lastPlayed">Last played</SelectItem>
-                  </SelectContent>
-                </Select>
-                
-                <UnifiedTooltip
-                  content={<p>Refresh company data</p>}
-                  side="top"
-                  variant="panel"
-                  density="compact"
-                >
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    onClick={handleRefresh}
-                    disabled={isLoading}
-                    className="flex items-center gap-1"
-                  >
-                    <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                    Refresh
-                  </Button>
-                </UnifiedTooltip>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {userCompanies.length === 0 ? (
-                <div className="text-center p-8">
-                  <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground mb-4">You don't have any companies yet.</p>
-                  <Button onClick={onBackToLogin} variant="outline">
-                    Create Your First Company
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {getSortedCompanies.map((company: Company) => (
-                    <Card 
-                      key={company.id}
-                      className={`hover:bg-accent/50 cursor-pointer transition-colors ${
-                        currentCompany?.id === company.id ? 'border-primary border-2' : ''
-                      } ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}
-                      onClick={() => handleSelectCompany(company)}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
-                              {company.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <h3 className="font-semibold">{company.name}</h3>
-                              <p className="text-sm text-muted-foreground">
-                                Day {company.currentDay}, Month {company.currentMonth}, {company.currentYear}
-                              </p>
-                            </div>
-                          </div>
-                          {currentCompany?.id === company.id && (
-                            <Badge>Current</Badge>
-                          )}
-                        </div>
-                        
-                        <div className="grid grid-cols-3 gap-4 text-sm">
-                          <div>
-                            <span className="text-muted-foreground">Money</span>
-                            <div className="font-medium">€{formatNumber(company.money, { decimals: 0, forceDecimals: true })}</div>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Prestige</span>
-                            <div className="font-medium">{formatNumber(company.prestige, { decimals: 1, forceDecimals: true })}</div>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Last Played</span>
-                            <div className="font-medium">{formatLastPlayed(company.lastPlayed)}</div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </div>
     </div>
   );

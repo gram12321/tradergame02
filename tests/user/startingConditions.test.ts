@@ -1,169 +1,123 @@
-import { describe, it, expect } from 'vitest';
-import { 
-  generateVineyardPreview,
-   
-} from '@/lib/services/core/startingConditionsService';
-import { 
-  STARTING_CONDITIONS, 
-  type StartingCountry,
-    
-} from '@/lib/constants/startingConditions';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { companyService } from '@/lib/services/user/companyService';
+import { applyStartingConditions } from '@/lib/services/core/startingConditionsService';
+import { setActiveCompany, resetGameState } from '@/lib/services/core/gameState';
+import { getCompanyById, deleteCompany } from '@/lib/database/core/companiesDB';
+import { insertUser, deleteUser } from '@/lib/database/core/usersDB';
 
 /**
- * Starting Conditions Tests - Pure Functions
+ * Starting Conditions Test
  * 
- * These tests validate starting condition generation without requiring database setup.
- * Focuses on configuration validation and preview generation logic.
+ * Validates that when starting conditions are applied to a new company,
+ * the company receives the correct starting money (€10,000).
+ * 
+ * This is an integration test that actually uses the database to ensure
+ * the money is persisted correctly.
  */
-describe('Starting Conditions - Pure Functions', () => {
-  const startingCountries: StartingCountry[] = ['France', 'Italy', 'Germany', 'Spain', 'United States'];
 
-  describe('generateVineyardPreview', () => {
-    startingCountries.forEach((country) => {
-      it(`generates valid vineyard preview for ${country}`, () => {
-        const condition = STARTING_CONDITIONS[country];
-        expect(condition).toBeDefined();
-        
-        const preview = generateVineyardPreview(condition);
-        
-        // Validate preview structure
-        expect(preview.name).toBeTruthy();
-        expect(preview.country).toBe(country);
-        expect(preview.region).toBe(condition.startingVineyard.region);
-        expect(preview.hectares).toBeGreaterThanOrEqual(condition.startingVineyard.minHectares);
-        expect(preview.hectares).toBeLessThanOrEqual(condition.startingVineyard.maxHectares + 0.01);
-        expect(Array.isArray(preview.soil)).toBe(true);
-        expect(preview.soil.length).toBeGreaterThan(0);
-        expect(preview.altitude).toBeGreaterThan(0);
-        expect(preview.density).toBeGreaterThan(0);
-        
-        // Validate altitude range if specified
-        if (condition.startingVineyard.minAltitude !== undefined && 
-            condition.startingVineyard.maxAltitude !== undefined) {
-          expect(preview.altitude).toBeGreaterThanOrEqual(condition.startingVineyard.minAltitude - 10);
-          expect(preview.altitude).toBeLessThanOrEqual(condition.startingVineyard.maxAltitude + 10);
-        }
-        
-        // Validate aspect if preferred aspects are specified
-        if (condition.startingVineyard.preferredAspects && 
-            condition.startingVineyard.preferredAspects.length > 0) {
-          expect(condition.startingVineyard.preferredAspects).toContain(preview.aspect);
-        }
-      });
+describe('Starting Conditions - Company Initialization', () => {
+  // Track created entities for cleanup
+  const createdCompanyIds: string[] = [];
+  const createdUserIds: string[] = [];
 
-      it(`generates different previews for ${country} on multiple calls`, () => {
-        const condition = STARTING_CONDITIONS[country];
-        const preview1 = generateVineyardPreview(condition);
-        const preview2 = generateVineyardPreview(condition);
-        
-        // Some properties should vary (at least hectares, altitude, aspect might differ)
-        // But country and region should always match
-        expect(preview1.country).toBe(preview2.country);
-        expect(preview1.region).toBe(preview2.region);
-      });
-    });
+  beforeEach(() => {
+    // Clear tracking arrays before each test
+    createdCompanyIds.length = 0;
+    createdUserIds.length = 0;
+    // Reset game state to ensure clean test environment
+    resetGameState();
   });
 
-  describe('Starting Condition Configuration', () => {
-    startingCountries.forEach((country) => {
-      it(`validates ${country} starting condition structure`, () => {
-        const condition = STARTING_CONDITIONS[country];
-        
-        // Basic structure
-        expect(condition.id).toBe(country);
-        expect(condition.name).toBeTruthy();
-        expect(condition.startingMoney).toBeGreaterThan(0);
-        
-        // Staff configuration
-        expect(Array.isArray(condition.staff)).toBe(true);
-        expect(condition.staff.length).toBeGreaterThan(0);
-        condition.staff.forEach((staff) => {
-          expect(staff.firstName).toBeTruthy();
-          expect(staff.lastName).toBeTruthy();
-          expect(staff.nationality).toBe(country);
-          expect(staff.skillLevel).toBeGreaterThan(0);
-          expect(staff.skillLevel).toBeLessThanOrEqual(1);
-          expect(Array.isArray(staff.specializations)).toBe(true);
-        });
-        
-        // Vineyard configuration
-        expect(condition.startingVineyard.country).toBe(country);
-        expect(condition.startingVineyard.region).toBeTruthy();
-        expect(condition.startingVineyard.minHectares).toBeGreaterThan(0);
-        expect(condition.startingVineyard.maxHectares).toBeGreaterThanOrEqual(
-          condition.startingVineyard.minHectares
-        );
-        
-        if (condition.startingVineyard.minAltitude !== undefined && 
-            condition.startingVineyard.maxAltitude !== undefined) {
-          expect(condition.startingVineyard.maxAltitude).toBeGreaterThanOrEqual(
-            condition.startingVineyard.minAltitude
-          );
-        }
-        
-        // Starting vine age
-        expect(condition.startingVineyard.startingVineAge).toBeDefined();
-        expect(condition.startingVineyard.startingVineAge).toBeGreaterThan(0);
-        expect(condition.startingVineyard.startingVineAge).toBeLessThan(50);
-      });
+  afterEach(async () => {
+    // Cleanup: Delete all created companies and users
+    for (const companyId of createdCompanyIds) {
+      try {
+        await deleteCompany(companyId);
+      } catch (error) {
+        console.error(`Failed to cleanup company ${companyId}:`, error);
+      }
+    }
+
+    for (const userId of createdUserIds) {
+      try {
+        await deleteUser(userId);
+      } catch (error) {
+        console.error(`Failed to cleanup user ${userId}:`, error);
+      }
+    }
+
+    // Clear arrays after cleanup
+    createdCompanyIds.length = 0;
+    createdUserIds.length = 0;
+    
+    // Reset game state after cleanup
+    resetGameState();
+  });
+
+  it('should grant €10,000 starting money to a new company when starting conditions are applied', async () => {
+    // Generate unique test user name
+    const testUserName = `TestUser_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    const testCompanyName = testUserName; // 1:1 relationship - company name = user name
+
+    // Step 1: Create a user
+    const userResult = await insertUser({
+      name: testUserName,
+      created_at: new Date().toISOString()
     });
 
-    it('validates that countries have unique starting conditions', () => {
-      const startingMoneys = startingCountries.map(c => STARTING_CONDITIONS[c].startingMoney);
-      const staffCounts = startingCountries.map(c => STARTING_CONDITIONS[c].staff.length);
-      
-      // Should have some variation
-      const uniqueMoneys = new Set(startingMoneys);
-      expect(uniqueMoneys.size).toBeGreaterThan(1);
-      
-      const uniqueStaffCounts = new Set(staffCounts);
-      expect(uniqueStaffCounts.size).toBeGreaterThan(1);
+    expect(userResult.success).toBe(true);
+    expect(userResult.data).toBeDefined();
+    expect(userResult.data?.id).toBeDefined();
+
+    const userId = userResult.data!.id;
+    createdUserIds.push(userId);
+
+    // Step 2: Create a company for the user
+    const companyResult = await companyService.createCompany({
+      name: testCompanyName,
+      userId: userId
     });
 
-    it('validates loan configuration when present', () => {
-      const countriesWithLoans = startingCountries.filter(
-        c => STARTING_CONDITIONS[c].startingLoan
-      );
-      
-      countriesWithLoans.forEach((country) => {
-        const loan = STARTING_CONDITIONS[country].startingLoan!;
-        expect(loan.principal).toBeGreaterThan(0);
-        expect(loan.durationSeasons).toBeGreaterThan(0);
-        expect(loan.lenderType).toBeTruthy();
-        if (loan.interestRate) {
-          expect(loan.interestRate).toBeGreaterThan(0);
-          expect(loan.interestRate).toBeLessThan(1);
-        }
-      });
-    });
+    expect(companyResult.success).toBe(true);
+    expect(companyResult.company).toBeDefined();
+    expect(companyResult.company?.id).toBeDefined();
 
-    it('validates prestige configuration when present', () => {
-      const countriesWithPrestige = startingCountries.filter(
-        c => STARTING_CONDITIONS[c].startingPrestige
-      );
-      
-      countriesWithPrestige.forEach((country) => {
-        const prestige = STARTING_CONDITIONS[country].startingPrestige!;
-        expect(prestige.amount).toBeGreaterThan(0);
-        expect(prestige.amount).toBeLessThan(100);
-        if (prestige.decayRate) {
-          expect(prestige.decayRate).toBeGreaterThan(0);
-          expect(prestige.decayRate).toBeLessThanOrEqual(1);
-        }
-      });
-    });
+    const company = companyResult.company!;
+    createdCompanyIds.push(company.id);
 
-    it('validates starting unlocked grape when present', () => {
-      const countriesWithGrape = startingCountries.filter(
-        c => STARTING_CONDITIONS[c].startingUnlockedGrape
-      );
-      
-      countriesWithGrape.forEach((country) => {
-        const grape = STARTING_CONDITIONS[country].startingUnlockedGrape!;
-        expect(typeof grape).toBe('string');
-        expect(grape.length).toBeGreaterThan(0);
-      });
-    });
+    // Verify company starts with 0 money
+    expect(company.money).toBe(0);
+
+    // Step 3: Set the company as active so updateGameState can update it
+    await setActiveCompany(company);
+
+    // Step 4: Apply starting conditions
+    const startingConditionsResult = await applyStartingConditions(company.id);
+
+    expect(startingConditionsResult.success).toBe(true);
+    expect(startingConditionsResult.startingMoney).toBe(10000);
+    expect(startingConditionsResult.error).toBeUndefined();
+
+    // Step 5: Verify the company has the correct money in the database
+    const updatedCompany = await getCompanyById(company.id);
+    
+    expect(updatedCompany).not.toBeNull();
+    expect(updatedCompany?.money).toBe(10000);
+    expect(updatedCompany?.id).toBe(company.id);
+    expect(updatedCompany?.name).toBe(testCompanyName);
+  });
+
+  it('should return error if company does not exist when applying starting conditions', async () => {
+    // Try to apply starting conditions to a non-existent company
+    const fakeCompanyId = '00000000-0000-0000-0000-000000000000';
+    
+    const result = await applyStartingConditions(fakeCompanyId);
+    
+    // The function should handle this gracefully and return an error
+    // (Transaction insert will fail due to foreign key constraint)
+    expect(result).toBeDefined();
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
   });
 });
 

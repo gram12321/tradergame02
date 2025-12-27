@@ -1,63 +1,70 @@
 import { supabase } from './supabase';
-import { GameState } from '../../types/types';
-import { getCurrentCompanyId } from '../../utils/companyUtils';
+import { getCurrentCompanyId } from '../../services/core/gameState';
 
 const GAME_STATE_TABLE = 'game_state';
 
 /**
  * Game State Database Operations
- * Pure CRUD operations for game state data persistence
+ * Basic CRUD operations for game state data persistence
+ * TODO: Define game state structure for trader game
  */
 
-export const saveGameState = async (gameState: Partial<GameState>): Promise<void> => {
+export interface GameStateData {
+  id?: string;
+  day?: number;
+  month?: number;
+  current_year?: number;
+  money?: number;
+  updated_at?: string;
+}
+
+/**
+ * Save game state
+ */
+export const saveGameState = async (gameState: Partial<GameStateData>): Promise<void> => {
   try {
-    const dataToSave = {
-      id: getCurrentCompanyId(),
-      player_name: 'Player',
-      day: gameState.day,
-      month: gameState.month,
-      current_year: gameState.currentYear,
-      money: gameState.money || 0,
-      prestige: gameState.prestige,
-      economy_phase: (gameState as any).economyPhase
+    const companyId = getCurrentCompanyId();
+    if (!companyId) return;
+
+    const dataToSave: GameStateData = {
+      id: companyId,
+      ...gameState,
+      updated_at: new Date().toISOString()
     };
-    
+
     const { error } = await supabase
       .from(GAME_STATE_TABLE)
       .upsert(dataToSave);
 
     if (error) throw error;
   } catch (error) {
-    // Silently fail
+    console.error('Error saving game state:', error);
+    // Silently fail - game state is non-critical
   }
 };
 
-export const loadGameState = async (): Promise<Partial<GameState> | null> => {
+/**
+ * Load game state
+ */
+export const loadGameState = async (): Promise<GameStateData | null> => {
   try {
+    const companyId = getCurrentCompanyId();
+    if (!companyId) return null;
+
     const { data, error } = await supabase
       .from(GAME_STATE_TABLE)
       .select('*')
-      .eq('id', getCurrentCompanyId());
+      .eq('id', companyId)
+      .single();
 
     if (error) {
+      if (error.code === 'PGRST116') return null; // Not found
       throw error;
     }
 
-    // If no record found, return null
-    if (!data || data.length === 0) {
-      return null;
-    }
-
-    const record = data[0];
-    return {
-      day: record.day,
-      month: record.month,
-      currentYear: record.current_year,
-      money: record.money,
-      prestige: record.prestige,
-      economyPhase: record.economy_phase
-    };
+    return data;
   } catch (error) {
+    console.error('Error loading game state:', error);
     return null;
   }
 };

@@ -5,24 +5,9 @@ import { formatGameDate } from "@/lib/utils/utils";
 import { NotificationCategory } from "@/lib/types/types";
 import { getTailwindClasses } from "@/lib/utils/colorMapping";
 import { cn } from "@/lib/utils/utils";
-import { notificationService } from "@/lib/services/core/notificationService";
+import { notificationService, type PlayerNotification } from "@/lib/services/core/notificationService";
 import { getGameState } from "@/lib/services/core/gameState";
-import { SEASON_ORDER } from "@/lib/constants";
-
-// Removed NotificationType - using category as the meaningful identifier
-
-export interface PlayerNotification {
-  id: string;
-  gameWeek: number;
-  gameSeason: string;
-  gameYear: number;
-  text: string;
-  origin: string;
-  userFriendlyOrigin: string;
-  category: NotificationCategory;
-  isRead?: boolean;
-  isDismissed?: boolean;
-}
+import { DAYS_PER_MONTH, MONTHS_PER_YEAR } from "@/lib/constants/timeConstants";
 
 interface NotificationCenterProps {
   onClose?: () => void;
@@ -126,34 +111,33 @@ export function NotificationCenter({ onClose, isOpen = false }: NotificationCent
   const filteredMessages = messages
     .filter(msg => !msg.isDismissed)
     .sort((a, b) => {
-      // Sort by year, then season, then week (descending)
+      // Sort by year, then month, then day (descending)
       if (a.gameYear !== b.gameYear) return b.gameYear - a.gameYear;
-      const aSeasonIndex = SEASON_ORDER.indexOf(a.gameSeason as typeof SEASON_ORDER[number]);
-      const bSeasonIndex = SEASON_ORDER.indexOf(b.gameSeason as typeof SEASON_ORDER[number]);
-      if (aSeasonIndex !== bSeasonIndex) return bSeasonIndex - aSeasonIndex;
-      return b.gameWeek - a.gameWeek;
+      if (a.gameMonth !== b.gameMonth) return b.gameMonth - a.gameMonth;
+      return b.gameDay - a.gameDay;
     });
 
   const recentMessages = showAll ? filteredMessages : filteredMessages.slice(0, 5);
   const unreadCount = filteredMessages.filter(msg => !msg.isRead).length;
 
   // Check if notification is old (more than 1 game year ago)
-  const isOldNotification = (_gameWeek: number, gameSeason: string, gameYear: number) => {
+  const isOldNotification = (gameDay: number, gameMonth: number, gameYear: number) => {
     const currentGameState = getGameState();
-    const currentSeason = currentGameState.season || 'Spring';
-    const currentYear = currentGameState.currentYear || 2024;
+    const currentDay = currentGameState.day || 1;
+    const currentMonth = currentGameState.month || 1;
+    const currentYear = currentGameState.year || 2024;
     
-    // Consider old if more than 1 year behind
-    if (currentYear - gameYear > 1) return true;
-    if (currentYear - gameYear === 1) {
-      // If exactly 1 year behind, check if it's significantly behind
-      const currentSeasonIndex = SEASON_ORDER.indexOf(currentSeason as typeof SEASON_ORDER[number]);
-      const notificationSeasonIndex = SEASON_ORDER.indexOf(gameSeason as typeof SEASON_ORDER[number]);
-      
-      // If we're in a much later season, it's old
-      if (currentSeasonIndex - notificationSeasonIndex > 2) return true;
-    }
-    return false;
+    // Calculate absolute days for comparison
+    const currentAbsoluteDays = (currentYear - 2024) * (DAYS_PER_MONTH * MONTHS_PER_YEAR) +
+                                (currentMonth - 1) * DAYS_PER_MONTH +
+                                (currentDay - 1);
+    const notificationAbsoluteDays = (gameYear - 2024) * (DAYS_PER_MONTH * MONTHS_PER_YEAR) +
+                                     (gameMonth - 1) * DAYS_PER_MONTH +
+                                     (gameDay - 1);
+    
+    // Consider old if more than 1 year (168 days) behind
+    const daysDifference = currentAbsoluteDays - notificationAbsoluteDays;
+    return daysDifference > (DAYS_PER_MONTH * MONTHS_PER_YEAR);
   };
 
   return (
@@ -202,7 +186,7 @@ export function NotificationCenter({ onClose, isOpen = false }: NotificationCent
                   ) : (
                     <div className="space-y-3">
                       {recentMessages.map((message) => {
-                        const isOld = isOldNotification(message.gameWeek, message.gameSeason, message.gameYear);
+                        const isOld = isOldNotification(message.gameDay, message.gameMonth, message.gameYear);
                         const isUnread = !message.isRead;
                         
                         // Get colors using new system
@@ -227,7 +211,7 @@ export function NotificationCenter({ onClose, isOpen = false }: NotificationCent
                                   variant="outline" 
                                   className={cn("mb-1 text-xs", classes.badge)}
                                 >
-                                  {formatGameDate(message.gameWeek, message.gameSeason, message.gameYear)}
+                                  {formatGameDate(message.gameDay, message.gameMonth, message.gameYear)}
                                 </Badge>
                                 <div className="flex gap-1">
                                   {isUnread && (
@@ -378,7 +362,7 @@ export function NotificationCenter({ onClose, isOpen = false }: NotificationCent
                   ) : (
                     <div className="space-y-3">
                       {recentMessages.map((message) => {
-                        const isOld = isOldNotification(message.gameWeek, message.gameSeason, message.gameYear);
+                        const isOld = isOldNotification(message.gameDay, message.gameMonth, message.gameYear);
                         const isUnread = !message.isRead;
                         
                         // Get colors using new system
@@ -403,7 +387,7 @@ export function NotificationCenter({ onClose, isOpen = false }: NotificationCent
                                   variant="outline" 
                                   className={cn("mb-1 text-xs md:text-sm", classes.badge)}
                                 >
-                                  {formatGameDate(message.gameWeek, message.gameSeason, message.gameYear)}
+                                  {formatGameDate(message.gameDay, message.gameMonth, message.gameYear)}
                                 </Badge>
                                 <div className="flex gap-1">
                                   {isUnread && (

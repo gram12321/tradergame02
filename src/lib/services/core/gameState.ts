@@ -1,27 +1,17 @@
 // Enhanced game state service that integrates with the new company system
 import { GameState } from '../../types/types';
 import { GAME_INITIALIZATION } from '../../constants/constants';
-import { CREDIT_RATING } from '../../constants/loanConstants';
-import { calculateCurrentPrestige, initializeBasePrestigeEvents, updateCompanyValuePrestige } from '../prestige/prestigeService';
 import { companyService } from '../user/companyService';
-import { Company, loadGameState, saveGameState } from '@/lib/database';
-import { initializeStaffSystem } from '../user/staffService';
-import { initializeTeamsSystem } from '../user/teamService';
+import { Company } from '@/lib/database';
 import { triggerGameUpdate } from '../../../hooks/useGameUpdates';
-import { initializeEconomyPhase } from '../finance/economyService';
-
 // Current active company and game state
 let currentCompany: Company | null = null;
 let gameState: Partial<GameState> = {
   day: GAME_INITIALIZATION.STARTING_DAY,
   month: GAME_INITIALIZATION.STARTING_MONTH,
-  currentYear: GAME_INITIALIZATION.STARTING_YEAR,
+  year: GAME_INITIALIZATION.STARTING_YEAR,
   companyName: '',
-  foundedYear: GAME_INITIALIZATION.STARTING_YEAR,
-  money: 0,
-  prestige: GAME_INITIALIZATION.STARTING_PRESTIGE,
-  creditRating: CREDIT_RATING.DEFAULT_RATING,
-  economyPhase: 'Stable'
+  money: 0
 };
 
 // Persistence key
@@ -43,9 +33,6 @@ function clearLastCompanyId(): void {
   }
 }
 
-let prestigeCache: { value: number; timestamp: number } | null = null;
-const PRESTIGE_CACHE_TTL = 5000; // 5 seconds cache
-
 // Game state management functions
 export const getGameState = (): Partial<GameState> => {
   return { ...gameState };
@@ -55,15 +42,20 @@ export const getCurrentCompany = (): Company | null => {
   return currentCompany;
 };
 
-export const updateGameState = async (updates: Partial<GameState>): Promise<void> => {
-  const oldMoney = gameState.money;
-  gameState = { ...gameState, ...updates };
-  
-  // Update base prestige events if money changed
-  if (updates.money !== undefined && updates.money !== oldMoney) {
-    await updateCompanyValuePrestige(updates.money);
-    prestigeCache = null; // clear cached total after base prestige changes
+/**
+ * Get current company ID - fails fast if no company is active
+ * This prevents silent failures when operations run against non-existent companies
+ */
+export const getCurrentCompanyId = (): string => {
+  const company = getCurrentCompany();
+  if (!company?.id) {
+    throw new Error('No active company found. Please select or create a company before performing this action.');
   }
+  return company.id;
+};
+
+export const updateGameState = async (updates: Partial<GameState>): Promise<void> => {
+  gameState = { ...gameState, ...updates };
   
   // Update company in database if we have an active company
   if (currentCompany) {
@@ -71,9 +63,8 @@ export const updateGameState = async (updates: Partial<GameState>): Promise<void
     
     if (updates.day !== undefined) companyUpdates.currentDay = updates.day;
     if (updates.month !== undefined) companyUpdates.currentMonth = updates.month;
-    if (updates.currentYear !== undefined) companyUpdates.currentYear = updates.currentYear;
+    if (updates.year !== undefined) companyUpdates.currentYear = updates.year;
     if (updates.money !== undefined) companyUpdates.money = updates.money;
-    if (updates.prestige !== undefined) companyUpdates.prestige = updates.prestige;
     
     if (Object.keys(companyUpdates).length > 0) {
       try {
@@ -81,29 +72,10 @@ export const updateGameState = async (updates: Partial<GameState>): Promise<void
         
         // Update our local company object
         currentCompany = { ...currentCompany, ...companyUpdates };
-        
-
       } catch (error) {
         console.error('Failed to update company in database:', error);
         // Continue with local state even if database update fails
       }
-    }
-  }
-
-  // Persist economyPhase to game_state table if it changed
-  if (updates.economyPhase !== undefined) {
-    try {
-      await saveGameState({
-        day: gameState.day,
-        month: gameState.month,
-        currentYear: gameState.currentYear,
-        money: gameState.money,
-        prestige: gameState.prestige,
-        economyPhase: updates.economyPhase
-      });
-    } catch (error) {
-      console.error('Failed to save economy phase to game_state:', error);
-      // Continue even if persistence fails
     }
   }
 
@@ -126,96 +98,50 @@ export const setActiveCompany = async (company: Company): Promise<void> => {
   // Persist only the lastCompanyId for autologin
   setLastCompanyId(company.id);
   
-  // Load persisted game state (including economy phase) for this company
-  let persisted = null as Partial<GameState> | null;
-  try {
-    persisted = await loadGameState();
-  } catch {}
-  
-  // If no persisted state, initialize once with defaults and set economyPhase to Stable
-  let ensuredEconomyPhase = persisted?.economyPhase;
-  if (!ensuredEconomyPhase) {
-    ensuredEconomyPhase = initializeEconomyPhase();
-    try {
-      await saveGameState({
-        day: company.currentDay,
-        month: company.currentMonth,
-        currentYear: company.currentYear,
-        money: company.money,
-        prestige: company.prestige,
-        economyPhase: ensuredEconomyPhase
-      });
-    } catch {}
-  }
-
-  // Update local game state to match company and DB (no fallback defaults here)
+  // Update local game state to match company
   gameState = {
     day: company.currentDay,
     month: company.currentMonth,
-    currentYear: company.currentYear,
+    year: company.currentYear,
     companyName: company.name,
-    foundedYear: company.foundedYear,
-    money: company.money,
-    prestige: company.prestige,
-    economyPhase: ensuredEconomyPhase
+    money: company.money
   };
-  
-  // Initialize prestige system for this company
-  try {
-    await initializePrestigeSystem();
-    // Ensure company value prestige is updated with current money
-    await updateCompanyValuePrestige(company.money);
-    prestigeCache = null;
-  } catch (error) {
-    console.error('Failed to initialize prestige system:', error);
-  }
-  
-  // Initialize staff system for this company
-  try {
-    await initializeStaffSystem();
-  } catch (error) {
-    console.error('Failed to initialize staff system:', error);
-  }
-  
-  // Initialize teams system for this company
-  try {
-    await initializeTeamsSystem();
-  } catch (error) {
-    console.error('Failed to initialize teams system:', error);
-  }
   
   // Trigger a final game update to ensure all components are synchronized
   triggerGameUpdate();
-  
-
 };
 
-export const createNewCompany = async (companyName: string, associateWithUser: boolean = false, userName?: string, userId?: string): Promise<Company | null> => {
+/**
+ * Load user's company (1:1 relationship - each user has exactly one company)
+ * Called automatically on login
+ */
+export const loadUserCompany = async (userId: string): Promise<Company | null> => {
+  try {
+    const company = await companyService.getUserCompany(userId);
+    if (company) {
+      await setActiveCompany(company);
+      return company;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error loading user company:', error);
+    return null;
+  }
+};
+
+/**
+ * Create company for user (1:1 relationship)
+ * User name and company name are the same
+ */
+export const createNewCompany = async (userId: string, companyName: string): Promise<Company | null> => {
   try {
     const result = await companyService.createCompany({
       name: companyName,
-      associateWithUser,
-      userName,
       userId
     });
     
     if (result.success && result.company) {
       await setActiveCompany(result.company);
-      
-      // Initialize teams system for new companies first
-      try {
-        await initializeTeamsSystem();
-      } catch (error) {
-        console.error('Error initializing teams system:', error);
-      }
-      
-      // Create starting staff for new companies (after teams are initialized)
-      try {
-        // Starting staff are now managed via starting conditions.
-      } catch (error) {
-        console.error('Error initializing staff system for new company:', error);
-      }
-
       return result.company;
     } else {
       console.error(result.error || 'Failed to create company');
@@ -233,64 +159,13 @@ export const resetGameState = (): void => {
   gameState = {
     day: GAME_INITIALIZATION.STARTING_DAY,
     month: GAME_INITIALIZATION.STARTING_MONTH,
-    currentYear: GAME_INITIALIZATION.STARTING_YEAR,
+    year: GAME_INITIALIZATION.STARTING_YEAR,
     companyName: '',
-    foundedYear: GAME_INITIALIZATION.STARTING_YEAR,
-    money: 0,
-    prestige: GAME_INITIALIZATION.STARTING_PRESTIGE
+    money: 0
   };
-  prestigeCache = null;
   
   // Clear the lastCompanyId to prevent autologin
   clearLastCompanyId();
-};
-
-// Get current prestige (with caching for performance)
-export async function getCurrentPrestige(): Promise<number> {
-  const now = Date.now();
-  
-  // Return cached value if still valid
-  if (prestigeCache && (now - prestigeCache.timestamp) < PRESTIGE_CACHE_TTL) {
-    return prestigeCache.value;
-  }
-  
-  try {
-    const { totalPrestige } = await calculateCurrentPrestige();
-    
-    // Update cache
-    prestigeCache = {
-      value: totalPrestige,
-      timestamp: now
-    };
-    
-    // Update game state with calculated prestige
-    gameState.prestige = totalPrestige;
-    
-    return totalPrestige;
-  } catch (error) {
-    console.error('Failed to calculate prestige:', error);
-    return gameState.prestige || GAME_INITIALIZATION.STARTING_PRESTIGE;
-  }
-}
-
-
-// Initialize prestige system
-export async function initializePrestigeSystem(): Promise<void> {
-  try {
-    await initializeBasePrestigeEvents();
-    
-    // Get initial prestige calculation
-    await getCurrentPrestige();
-    
-  } catch (error) {
-    console.error('Failed to initialize prestige system:', error);
-  }
-}
-
-
-// Clear prestige cache (for admin functions)
-export const clearPrestigeCache = (): void => {
-  prestigeCache = null;
 };
 
 // Export clearLastCompanyId for explicit logout handling

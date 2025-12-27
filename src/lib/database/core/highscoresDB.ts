@@ -4,115 +4,22 @@ const HIGHSCORES_TABLE = 'highscores';
 
 /**
  * Highscores Database Operations
- * Pure CRUD operations for highscores data persistence
+ * Basic CRUD operations for highscores data persistence
  */
 
-export type ScoreType = 
-  | 'company_value' 
-  | 'company_value_per_week'
-  | 'highest_vintage_quantity'
-  | 'most_productive_vineyard'
-  | 'highest_wine_score'
-  | 'highest_grape_quality'
-  | 'highest_balance'
-  | 'highest_price'
-  | 'lowest_price';
+export type ScoreType = string;
 
 export interface HighscoreData {
   company_id: string;
   company_name: string;
   score_type: ScoreType;
   score_value: number;
-  game_week?: number;
-  game_season?: string;
+  game_day?: number;
+  game_month?: number;
   game_year?: number;
-  vineyard_id?: string;
-  vineyard_name?: string;
-  wine_vintage?: number;
-  grape_variety?: string;
   achieved_at: string;
+  metadata?: Record<string, any>;
 }
-
-export const getExistingScore = async (companyId: string, scoreType: ScoreType): Promise<any | null> => {
-  try {
-    const { data, error } = await supabase
-      .from(HIGHSCORES_TABLE)
-      .select('score_value')
-      .eq('company_id', companyId)
-      .eq('score_type', scoreType)
-      .limit(1);
-
-    if (error) throw error;
-    return data?.[0] || null;
-  } catch (error) {
-    console.error('Error getting existing score:', error);
-    return null;
-  }
-};
-
-export const upsertHighscore = async (highscoreData: HighscoreData): Promise<{ success: boolean; error?: string }> => {
-  try {
-    const isCompanyAggregate = highscoreData.score_type === 'company_value' || highscoreData.score_type === 'company_value_per_week';
-
-    if (isCompanyAggregate) {
-      // For aggregate types, manually handle upsert since Supabase onConflict doesn't work with partial unique indexes
-      // Check if a record exists first
-      const existing = await getExistingScore(highscoreData.company_id, highscoreData.score_type);
-      
-      if (existing) {
-        // Update existing record - include all fields from highscoreData
-        const updateData: Partial<HighscoreData> = {
-          company_name: highscoreData.company_name,
-          score_value: highscoreData.score_value,
-          game_week: highscoreData.game_week,
-          game_season: highscoreData.game_season,
-          game_year: highscoreData.game_year,
-          achieved_at: highscoreData.achieved_at
-        };
-        
-        // Include optional fields if they exist
-        if (highscoreData.vineyard_id !== undefined) updateData.vineyard_id = highscoreData.vineyard_id;
-        if (highscoreData.vineyard_name !== undefined) updateData.vineyard_name = highscoreData.vineyard_name;
-        if (highscoreData.wine_vintage !== undefined) updateData.wine_vintage = highscoreData.wine_vintage;
-        if (highscoreData.grape_variety !== undefined) updateData.grape_variety = highscoreData.grape_variety;
-        
-        const { error } = await supabase
-          .from(HIGHSCORES_TABLE)
-          .update(updateData)
-          .eq('company_id', highscoreData.company_id)
-          .eq('score_type', highscoreData.score_type);
-        
-        if (error) {
-          return { success: false, error: error.message };
-        }
-        return { success: true };
-      } else {
-        // Insert new record
-        const { error } = await supabase
-          .from(HIGHSCORES_TABLE)
-          .insert(highscoreData);
-        
-        if (error) {
-          return { success: false, error: error.message };
-        }
-        return { success: true };
-      }
-    }
-
-    // For non-aggregate types, allow multiple entries per company
-    const { error } = await supabase
-      .from(HIGHSCORES_TABLE)
-      .insert(highscoreData);
-
-    if (error) {
-      return { success: false, error: error.message };
-    }
-    return { success: true };
-  } catch (error: any) {
-    console.error('Error upserting/inserting highscore:', error);
-    return { success: false, error: error.message || 'An unexpected error occurred' };
-  }
-};
 
 export interface HighscoreEntry {
   id: string;
@@ -120,15 +27,12 @@ export interface HighscoreEntry {
   companyName: string;
   scoreType: ScoreType;
   scoreValue: number;
-  gameWeek?: number;
-  gameSeason?: string;
+  gameDay?: number;
+  gameMonth?: number;
   gameYear?: number;
   achievedAt: Date;
   createdAt: Date;
-  vineyardId?: string;
-  vineyardName?: string;
-  wineVintage?: number;
-  grapeVariety?: string;
+  metadata?: Record<string, any>;
 }
 
 /**
@@ -139,24 +43,41 @@ function mapHighscoreFromDB(dbScore: any): HighscoreEntry {
     id: dbScore.id,
     companyId: dbScore.company_id,
     companyName: dbScore.company_name,
-    scoreType: dbScore.score_type as ScoreType,
+    scoreType: dbScore.score_type,
     scoreValue: dbScore.score_value,
-    gameWeek: dbScore.game_week,
-    gameSeason: dbScore.game_season,
+    gameDay: dbScore.game_day,
+    gameMonth: dbScore.game_month,
     gameYear: dbScore.game_year,
     achievedAt: new Date(dbScore.achieved_at),
     createdAt: new Date(dbScore.created_at),
-    vineyardId: dbScore.vineyard_id,
-    vineyardName: dbScore.vineyard_name,
-    wineVintage: dbScore.wine_vintage,
-    grapeVariety: dbScore.grape_variety
+    metadata: dbScore.metadata
   };
 }
 
-export const loadHighscores = async (scoreType: ScoreType, limit: number = 20): Promise<HighscoreEntry[]> => {
+/**
+ * Upsert highscore
+ */
+export const upsertHighscore = async (highscoreData: HighscoreData): Promise<{ success: boolean; error?: string }> => {
   try {
-    const ascending = scoreType === 'lowest_price';
-    
+    const { error } = await supabase
+      .from(HIGHSCORES_TABLE)
+      .upsert(highscoreData);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error upserting highscore:', error);
+    return { success: false, error: error.message || 'An unexpected error occurred' };
+  }
+};
+
+/**
+ * Load highscores by type
+ */
+export const loadHighscores = async (scoreType: ScoreType, limit: number = 20, ascending: boolean = false): Promise<HighscoreEntry[]> => {
+  try {
     const { data, error } = await supabase
       .from(HIGHSCORES_TABLE)
       .select('*')
@@ -173,85 +94,34 @@ export const loadHighscores = async (scoreType: ScoreType, limit: number = 20): 
 };
 
 /**
- * Load a specific ordered window of highscores by index range
+ * Get company score
  */
-export const loadHighscoresRange = async (
-  scoreType: ScoreType,
-  start: number,
-  end: number
-): Promise<HighscoreEntry[]> => {
-  try {
-    const ascending = scoreType === 'lowest_price';
-    const { data, error } = await supabase
-      .from(HIGHSCORES_TABLE)
-      .select('*')
-      .eq('score_type', scoreType)
-      .order('score_value', { ascending })
-      .range(start, end);
-
-    if (error) throw error;
-    return (data || []).map(mapHighscoreFromDB);
-  } catch (error) {
-    console.error('Error loading highscores range:', error);
-    return [];
-  }
-};
-
 export const getCompanyScore = async (companyId: string, scoreType: ScoreType): Promise<any | null> => {
   try {
     const { data, error } = await supabase
       .from(HIGHSCORES_TABLE)
       .select('score_value')
       .eq('company_id', companyId)
-      .eq('score_type', scoreType);
+      .eq('score_type', scoreType)
+      .single();
 
-    if (error) throw error;
-    return data?.[0] || null;
+    if (error) return null;
+    return data;
   } catch (error) {
     console.error('Error getting company score:', error);
     return null;
   }
 };
 
-export const countHigherScores = async (scoreType: ScoreType, scoreValue: number): Promise<number | null> => {
-  try {
-    const { count, error } = await supabase
-      .from(HIGHSCORES_TABLE)
-      .select('*', { count: 'exact', head: true })
-      .eq('score_type', scoreType)
-      .gt('score_value', scoreValue);
-
-    if (error) throw error;
-    return count;
-  } catch (error) {
-    console.error('Error counting higher scores:', error);
-    return null;
-  }
-};
-
-export const countTotalScores = async (scoreType: ScoreType): Promise<number | null> => {
-  try {
-    const { count, error } = await supabase
-      .from(HIGHSCORES_TABLE)
-      .select('*', { count: 'exact', head: true })
-      .eq('score_type', scoreType);
-
-    if (error) throw error;
-    return count;
-  } catch (error) {
-    console.error('Error counting total scores:', error);
-    return null;
-  }
-};
-
+/**
+ * Delete highscores
+ */
 export const deleteHighscores = async (scoreType?: ScoreType): Promise<{ success: boolean; error?: string }> => {
   try {
     let query = supabase.from(HIGHSCORES_TABLE).delete();
-    
+
     if (scoreType) {
       query = query.eq('score_type', scoreType);
-    } else {
-      query = query.neq('id', ''); // Delete all
     }
 
     const { error } = await query;
@@ -266,4 +136,3 @@ export const deleteHighscores = async (scoreType?: ScoreType): Promise<{ success
     return { success: false, error: error.message || 'An unexpected error occurred' };
   }
 };
-

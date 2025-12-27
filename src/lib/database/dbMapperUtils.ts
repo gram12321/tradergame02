@@ -1,4 +1,4 @@
-import { Season, GameDate } from '../types/types';
+import { GameDate } from '../types/types';
 
 /**
  * Database Mapper Utilities
@@ -22,19 +22,19 @@ export function toOptionalString(value: any): string | undefined {
 }
 
 /**
- * Build GameDate from separate week/season/year fields
+ * Build GameDate from separate day/month/year fields
  * Returns undefined if any field is missing
  */
 export function buildGameDate(
-  week: any,
-  season: any,
+  day: any,
+  month: any,
   year: any
 ): GameDate | undefined {
-  if (week && season && year) {
+  if (day != null && month != null && year != null) {
     return {
-      week,
-      season: season as Season,
-      year
+      day: Number(day),
+      month: Number(month),
+      year: Number(year)
     };
   }
   return undefined;

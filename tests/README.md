@@ -1,13 +1,11 @@
 # Automated Test Suites
 
-This folder hosts all executable test suites for Winemaker04. Tests focus on validating simulation logic, game mechanics, and core calculations.
+This folder hosts all executable test suites for the game. Tests focus on validating core system logic and game mechanics.
 
 ## Structure
 
-- `activity/` – Work unit calculations, staffing, scheduling
-- `vineyard/` – Yield calculations, health degradation, grape suitability
-- `wine/` – Fermentation effects, characteristics calculations
-- `finance/` – (Future) Pricing, economy formulas
+- `user/` – User and company management tests
+- `finance/` – Financial calculations and transactions
 - `helpers/` – (Future) Shared factories and fixtures
 
 Add new domain folders as coverage grows.
@@ -31,44 +29,19 @@ Vitest is configured in `vite.config.ts` and automatically discovers files match
 
 ---
 
-## Testing Strategy Roadmap
+## Testing Strategy
 
-### ✅ Phase 0 – Foundations (COMPLETE)
+### System-Level Tests
 
-- [x] Install Vitest and add `npm test` / `npm run test:watch`
-- [x] Enable TypeScript support for `tests/` folder
-- [x] Add initial test suite: `tests/activity/workCalculator.test.ts`
-- [x] Document testing workflow
+Focus on testing core system functionality that is not game-specific:
+- User/Company creation and management (1:1 relationship)
+- Financial transactions and calculations
+- Database operations
+- Core game state management
 
-### 🔄 Phase 1 – Core Mechanics (IN PROGRESS)
+### Game-Specific Tests
 
-Target modules:
-- [x] `@/lib/services/activity/workcalculators/*` (work calculations) - ✅ 5 tests
-- [x] `@/lib/services/vineyard/vineyardManager.ts` (yield calculations) - ✅ 11 tests
-- [x] `@/lib/services/vineyard/vineyardValueCalc.ts` (grape suitability) - ✅ 12 tests
-- [x] `@/lib/services/wine/characteristics/fermentationCharacteristics.ts` (fermentation effects) - ✅ 14 tests
-- [x] `@/lib/services/finance/wageService.ts` (wage calculations) - ✅ 8 tests
-- [x] `@/lib/services/finance/loanService.ts` (loan calculations) - ✅ 15 tests
-
-**Total Phase 1 Progress: 65 tests across 6 test files**
-
-**Approach for each module:**
-1. Identify pure calculation helpers (no Supabase/database calls)
-2. Write scenario-based tests (normal cases, edge cases, boundary conditions)
-3. Capture intent in test names so future AI understands the contract
-
-### 📋 Phase 2 – Integrated Flows (FUTURE)
-
-Goal: Ensure multi-step processes stay stable when business rules change.
-
-Candidate flows:
-- Vineyard lifecycle → Harvest → Crushing → Fermentation
-- Sales pipeline: `saveWineOrder` → `fulfillWineOrder` → prestige events
-- Finance ledger balancing
-
-**Approach:**
-- Use mocked services or fixture builders to keep tests deterministic
-- Prefer domain-specific helper factories in `tests/helpers/`
+Game-specific tests (wine, vineyards, etc.) have been removed as the game is being rebuilt. New game-specific tests should be added as new features are developed.
 
 ---
 
@@ -92,5 +65,3 @@ Candidate flows:
 - ✅ Every gameplay-critical formula has at least one unit test guarding regressions
 - ✅ A failing Vitest run immediately points to the domain that broke
 - ✅ Test documentation remains synced with actual test suites
-
-When a phase completes, update `docs/versionlog.md` to record the testing milestone.

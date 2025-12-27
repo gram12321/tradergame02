@@ -1,14 +1,14 @@
 import { supabase } from './supabase';
-import { Season, Transaction } from '../../types/types';
-import { getCurrentCompanyId } from '../../utils/companyUtils';
-import { SEASON_ORDER } from '@/lib/constants';
+import { Transaction } from '../../types/types';
+import { getCurrentCompanyId } from '../../services/core/gameState';
 import { buildGameDate } from '../dbMapperUtils';
+import { GAME_INITIALIZATION } from '@/lib/constants';
 
 const TRANSACTIONS_TABLE = 'transactions';
 
 /**
  * Transactions Database Operations
- * Pure CRUD operations for transaction data persistence
+ * Basic CRUD operations for transaction data persistence
  */
 
 export interface TransactionData {
@@ -19,10 +19,9 @@ export interface TransactionData {
   category: string;
   recurring: boolean;
   money: number;
-  week: number;
-  season: Season;
+  day: number;
+  month: number;
   year: number;
-  created_at?: string;
 }
 
 /**
@@ -31,10 +30,10 @@ export interface TransactionData {
 function mapTransactionFromDB(row: any): Transaction {
   return {
     id: row.id,
-    date: buildGameDate(row.week, row.season, row.year) || {
-      week: 1,
-      season: 'Spring' as Season,
-      year: 2024
+    date: buildGameDate(row.day, row.month, row.year) || {
+      day: GAME_INITIALIZATION.STARTING_DAY,
+      month: GAME_INITIALIZATION.STARTING_MONTH,
+      year: GAME_INITIALIZATION.STARTING_YEAR
     },
     amount: row.amount,
     description: row.description,
@@ -44,6 +43,9 @@ function mapTransactionFromDB(row: any): Transaction {
   };
 }
 
+/**
+ * Insert transaction
+ */
 export const insertTransaction = async (transactionData: TransactionData): Promise<{ success: boolean; data?: any; error?: string }> => {
   try {
     const { data, error } = await supabase
@@ -63,6 +65,9 @@ export const insertTransaction = async (transactionData: TransactionData): Promi
   }
 };
 
+/**
+ * Load transactions
+ */
 export const loadTransactions = async (): Promise<Transaction[]> => {
   try {
     const { data, error } = await supabase
@@ -71,25 +76,14 @@ export const loadTransactions = async (): Promise<Transaction[]> => {
       .eq('company_id', getCurrentCompanyId());
 
     if (error) throw error;
-    
-    // Map to Transaction objects first, preserving the created_at field
-    const transactions = (data || []).map(row => ({
-      ...mapTransactionFromDB(row),
-      created_at: row.created_at
-    }));
-    
-    // Sort in JavaScript to ensure proper ordering
+
+    const transactions = (data || []).map(row => mapTransactionFromDB(row));
+
+    // Sort by date (newest first)
     return transactions.sort((a, b) => {
       if (a.date.year !== b.date.year) return b.date.year - a.date.year;
-      if (a.date.season !== b.date.season) {
-        return SEASON_ORDER.indexOf(b.date.season) - SEASON_ORDER.indexOf(a.date.season);
-      }
-      if (a.date.week !== b.date.week) return b.date.week - a.date.week;
-      // For same week transactions, sort by created_at timestamp
-      if (a.created_at && b.created_at) {
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      }
-      // Fallback to ID comparison if created_at is not available
+      if (a.date.month !== b.date.month) return b.date.month - a.date.month;
+      if (a.date.day !== b.date.day) return b.date.day - a.date.day;
       return b.id.localeCompare(a.id);
     });
   } catch (error) {
@@ -97,4 +91,3 @@ export const loadTransactions = async (): Promise<Transaction[]> => {
     return [];
   }
 };
-

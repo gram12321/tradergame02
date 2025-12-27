@@ -1,17 +1,18 @@
-// ===== NOTIFICATION OPERATIONS =====
-
 import { supabase } from './supabase';
-import { getCurrentCompanyId } from '../../utils/companyUtils';
+import { getCurrentCompanyId } from '../../services/core/gameState';
 import { NotificationCategory } from '../../types/types';
 
 const NOTIFICATIONS_TABLE = 'notifications';
 
-// Removed DbNotificationType - using category as the meaningful identifier
+/**
+ * Notification Database Operations
+ * Basic CRUD operations for notification data persistence
+ */
 
 export interface DbNotificationRecord {
   id: string;
-  game_week: number;
-  game_season: string;
+  game_day: number;
+  game_month: number;
   game_year: number;
   text: string;
   origin: string;
@@ -24,20 +25,13 @@ export interface NotificationFilter {
   type: 'origin' | 'category';
   value: string;
   description?: string;
-  blockFromHistory?: boolean;  // If true, completely silence (no toast + no history)
+  blockFromHistory?: boolean;
   createdAt: string;
 }
 
-export interface NotificationFilterRecord {
-  id: string;
-  company_id: string;
-  filter_type: 'origin' | 'category';
-  filter_value: string;
-  description?: string;
-  block_from_history?: boolean;
-  created_at: string;
-}
-
+/**
+ * Save notification
+ */
 export const saveNotification = async (notification: DbNotificationRecord): Promise<void> => {
   try {
     const { error } = await supabase
@@ -45,8 +39,8 @@ export const saveNotification = async (notification: DbNotificationRecord): Prom
       .upsert({
         id: notification.id,
         company_id: getCurrentCompanyId(),
-        game_week: notification.game_week,
-        game_season: notification.game_season,
+        game_day: notification.game_day,
+        game_month: notification.game_month,
         game_year: notification.game_year,
         text: notification.text,
         origin: notification.origin || null,
@@ -56,10 +50,13 @@ export const saveNotification = async (notification: DbNotificationRecord): Prom
 
     if (error) throw error;
   } catch (error) {
-    // Silently fail - notifications are non-critical for gameplay
+    // Silently fail - notifications are non-critical
   }
 };
 
+/**
+ * Load notifications
+ */
 export const loadNotifications = async (): Promise<DbNotificationRecord[]> => {
   try {
     const { data, error } = await supabase
@@ -67,15 +64,15 @@ export const loadNotifications = async (): Promise<DbNotificationRecord[]> => {
       .select('*')
       .eq('company_id', getCurrentCompanyId())
       .order('game_year', { ascending: false })
-      .order('game_season', { ascending: false })
-      .order('game_week', { ascending: false });
+      .order('game_month', { ascending: false })
+      .order('game_day', { ascending: false });
 
     if (error) throw error;
 
     return (data || []).map(row => ({
       id: row.id,
-      game_week: row.game_week,
-      game_season: row.game_season,
+      game_day: row.game_day || 1,
+      game_month: row.game_month || 1,
       game_year: row.game_year,
       text: row.text,
       origin: row.origin,
@@ -87,6 +84,9 @@ export const loadNotifications = async (): Promise<DbNotificationRecord[]> => {
   }
 };
 
+/**
+ * Clear notifications
+ */
 export const clearNotifications = async (): Promise<void> => {
   try {
     const { error } = await supabase
@@ -104,6 +104,9 @@ export const clearNotifications = async (): Promise<void> => {
 
 const NOTIFICATION_FILTERS_TABLE = 'notification_filters';
 
+/**
+ * Save notification filter
+ */
 export const saveNotificationFilter = async (filter: NotificationFilter): Promise<void> => {
   try {
     const { error } = await supabase
@@ -120,10 +123,13 @@ export const saveNotificationFilter = async (filter: NotificationFilter): Promis
 
     if (error) throw error;
   } catch (error) {
-    // Silently fail - filters are non-critical for gameplay
+    // Silently fail - filters are non-critical
   }
 };
 
+/**
+ * Load notification filters
+ */
 export const loadNotificationFilters = async (): Promise<NotificationFilter[]> => {
   try {
     const { data, error } = await supabase
@@ -147,6 +153,9 @@ export const loadNotificationFilters = async (): Promise<NotificationFilter[]> =
   }
 };
 
+/**
+ * Delete notification filter
+ */
 export const deleteNotificationFilter = async (filterId: string): Promise<void> => {
   try {
     const { error } = await supabase
@@ -161,6 +170,9 @@ export const deleteNotificationFilter = async (filterId: string): Promise<void> 
   }
 };
 
+/**
+ * Clear notification filters
+ */
 export const clearNotificationFilters = async (): Promise<void> => {
   try {
     const { error } = await supabase

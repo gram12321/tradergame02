@@ -1,15 +1,12 @@
 import { useState, useMemo } from 'react';
-import { getCurrentPrestige, processGameTick, clearLastCompanyIdForLogout, getCurrentCompany } from '@/lib/services';
+import { processGameTick, clearLastCompanyIdForLogout, getCurrentCompany } from '@/lib/services';
 import { formatGameDate, formatNumber } from '@/lib/utils';
 import { NAVIGATION_EMOJIS } from '@/lib/utils';
 import { Button, Badge, Avatar, AvatarFallback, AvatarImage, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui';
 import { NotificationCenter, useNotifications } from '@/components/layout/NotificationCenter';
-import { useGameState, useGameStateWithData, useLoadingState } from '@/hooks';
+import { useGameState, useLoadingState } from '@/hooks';
 import { CalendarDays, MessageSquareText, LogOut, MenuIcon, X } from 'lucide-react';
-import { PrestigeModal } from '@/components/ui';
 import { NavigationProps, CompanyProps } from '@/lib/types/UItypes';
-import { getEconomyPhaseColorClass } from '@/lib/utils';
-import { UnifiedTooltip } from '@/components/ui/shadCN/tooltip';
 import versionLogRaw from '../../../docs/versionlog.md?raw';
 
 
@@ -21,14 +18,8 @@ interface HeaderProps extends NavigationProps, CompanyProps {
 
 const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, onTimeAdvance, onBackToLogin }) => {
   const gameState = useGameState();
-  const [prestigeModalOpen, setPrestigeModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { isLoading: isAdvancingTime, withLoading } = useLoadingState();
-  const [prestigeData, setPrestigeData] = useState<any>({ 
-    totalPrestige: 0, 
-    eventBreakdown: [],
-    companyPrestige: 0
-  });
   const consoleHook = useNotifications();
   
   // Extract latest version from docs/versionlog.md (first "## Version X" occurrence)
@@ -44,30 +35,12 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, onTimeAdvance,
   // Get current company once instead of multiple calls
   const currentCompany = getCurrentCompany();
 
-  // Use consolidated hook for reactive prestige loading
-  const currentPrestige = useGameStateWithData(getCurrentPrestige, 1);
-
   const handleIncrementWeek = () => {
     withLoading(async () => {
       await processGameTick();
       // Game state will be updated automatically via the useGameState hook
       onTimeAdvance();
     });
-  };
-
-  const handlePrestigeClick = async () => {
-    try {
-      // Simplified prestige display - can be enhanced later
-      const totalPrestige = await getCurrentPrestige();
-      setPrestigeData({
-        totalPrestige: totalPrestige,
-        eventBreakdown: [],
-        companyPrestige: totalPrestige
-      });
-      setPrestigeModalOpen(true);
-    } catch (error) {
-      console.error('Error loading prestige data:', error);
-    }
   };
 
   const handleNavigation = (page: string) => {
@@ -78,8 +51,6 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, onTimeAdvance,
   const navItems = [
     { id: 'dashboard', label: 'Company', icon: NAVIGATION_EMOJIS.dashboard },
     { id: 'finance', label: 'Finance', icon: NAVIGATION_EMOJIS.finance },
-    { id: 'staff', label: 'Staff', icon: '👥' },
-    { id: 'sales', label: 'Sales', icon: NAVIGATION_EMOJIS.sales }
   ];
 
   return (
@@ -113,7 +84,7 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, onTimeAdvance,
             <div className="flex items-center space-x-2 mr-2">
               <CalendarDays className="h-3.5 w-3.5" />
               <span className="text-[10px] font-medium whitespace-nowrap hidden sm:block">
-                {formatGameDate(gameState.day, gameState.month, gameState.currentYear)}
+                {formatGameDate(gameState.day, gameState.month, gameState.year)}
               </span>
               <span className="text-[10px] font-medium whitespace-nowrap sm:hidden">
                 D{gameState.day}
@@ -160,61 +131,7 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, onTimeAdvance,
               <span className="font-medium text-xs">{formatNumber(gameState.money || 0, { currency: true, compact: true, decimals: 1 })}</span>
             </Badge>
             
-            {/* Prestige display - responsive */}
-            <Badge 
-              variant="outline" 
-              className="bg-red-700 text-white border-red-500 px-2 py-0.5 flex items-center cursor-pointer hover:bg-red-600 transition-colors hidden sm:flex"
-              onClick={handlePrestigeClick}
-            >
-              <span className="font-medium">⭐ {currentPrestige >= 1000 ? formatNumber(currentPrestige, { compact: true, decimals: 1 }) : formatNumber(currentPrestige, { decimals: 1, forceDecimals: true })}</span>
-            </Badge>
-            
-            <Badge 
-              variant="outline" 
-              className="bg-red-700 text-white border-red-500 px-1.5 py-0.5 flex items-center cursor-pointer hover:bg-red-600 transition-colors sm:hidden"
-              onClick={handlePrestigeClick}
-            >
-              <span className="font-medium text-xs">⭐ {formatNumber(currentPrestige, { compact: true, decimals: 1 })}</span>
-            </Badge>
 
-            {/* Economy Phase display - responsive with tooltip */}
-            <UnifiedTooltip
-              content={
-                <div className="space-y-1">
-                  <p className="font-semibold">Economy Effects</p>
-                  <p className="text-xs text-gray-300">Impacts sales, event frequency, and risks.</p>
-                </div>
-              }
-              side="bottom"
-              variant="panel"
-              density="compact"
-              className="max-w-sm"
-              onClick={() => {
-                // Economy phase display - navigation can be customized later
-              }}
-            >
-              <Badge 
-                variant="outline" 
-                className={`px-2 py-0.5 flex items-center cursor-pointer transition-colors hidden sm:flex ${getEconomyPhaseColorClass(gameState.economyPhase || 'Stable')}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // Economy phase display - navigation can be customized later
-                }}
-              >
-                <span className="w-2 h-2 rounded-full bg-green-400 mr-1.5"></span>
-                <span className="font-medium">{gameState.economyPhase || 'Stable'}</span>
-              </Badge>
-            </UnifiedTooltip>
-            
-            <Badge 
-              variant="outline" 
-              className={`px-1.5 py-0.5 flex items-center cursor-pointer transition-colors sm:hidden ${getEconomyPhaseColorClass(gameState.economyPhase || 'Stable')}`}
-              onClick={() => {
-                // Economy phase display - navigation can be customized later
-              }}>
-              <span className="font-medium text-xs">{gameState.economyPhase}</span>
-            </Badge>
-            
             {/* Console button - responsive */}
             <Button 
               variant="ghost" 
@@ -358,7 +275,7 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, onTimeAdvance,
             <div className="space-y-1">
               <div className="flex flex-col space-y-2 mb-6 p-3 bg-blue-50 rounded-md">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">{formatGameDate(gameState.day, gameState.month, gameState.currentYear)}</span>
+                  <span className="font-medium">{formatGameDate(gameState.day, gameState.month, gameState.year)}</span>
                   <Button 
                     onClick={() => {
                       handleIncrementWeek();
@@ -383,15 +300,7 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, onTimeAdvance,
                       {formatNumber(gameState.money || 0, { currency: true })}
                     </span>
                   </Badge>
-                  <Badge 
-                    variant="secondary" 
-                    className="flex-1 py-1 flex items-center justify-center gap-1.5 bg-purple-50 text-purple-700"
-                  >
-                    <span>⭐</span>
-                    <span className="font-medium">
-                      {currentPrestige >= 1000 ? formatNumber(currentPrestige, { compact: true, decimals: 1 }) : formatNumber(currentPrestige, { decimals: 1, forceDecimals: true })}
-                    </span>
-                  </Badge>
+
                 </div>
               </div>
               
@@ -482,14 +391,6 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, onTimeAdvance,
         />
       }
       
-      {/* Prestige Breakdown Modal */}
-      <PrestigeModal
-        isOpen={prestigeModalOpen}
-        onClose={() => setPrestigeModalOpen(false)}
-        totalPrestige={prestigeData.totalPrestige}
-        eventBreakdown={prestigeData.eventBreakdown}
-        companyPrestige={prestigeData.companyPrestige}
-      />
     </>
   );
 };

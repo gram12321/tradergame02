@@ -114,6 +114,18 @@ class AuthService {
         return { success: false, error: 'Failed to create user profile' };
       }
 
+      // Auto-create company for user (1:1 relationship - user name = company name)
+      const { companyService } = await import('./companyService');
+      const companyResult = await companyService.createCompany({
+        name: name, // User name = Company name
+        userId: authData.user.id
+      });
+
+      if (!companyResult.success && companyResult.error !== 'User already has a company') {
+        console.error('Error creating company for user:', companyResult.error);
+        // Don't fail signup if company creation fails - user can create it later
+      }
+
       await notificationService.addMessage(`Welcome ${name}! Please check your email to verify your account.`, 'authService.register', 'User Registration', NotificationCategory.SYSTEM);
       return { success: true };
     } catch (error) {

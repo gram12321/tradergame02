@@ -2,9 +2,39 @@ import {
   getUserSettings as loadUserSettingsFromDB, 
   upsertUserSettings as saveUserSettingsToDB, 
   deleteUserSettings as deleteUserSettingsFromDB,
-  type UserSettings,
   type UserSettingsData
 } from '@/lib/database';
+
+// UserSettings interface (camelCase version for app usage)
+export interface UserSettings {
+  id?: string;
+  userId: string;
+  companyId: string;
+  showToastNotifications?: boolean;
+  allowResourceSubstitution?: boolean;
+  showDetailedInputSection?: boolean;
+  notificationCategories?: Record<string, boolean>;
+  notificationSpecificMessages?: Record<string, boolean>;
+  viewPreferences?: Record<string, ViewPreferences>;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// Map database format to app format
+const mapSettingsFromDB = (data: UserSettingsData): UserSettings => {
+  return {
+    id: data.user_id, // Assuming user_id,company_id composite key - may need adjustment
+    userId: data.user_id,
+    companyId: data.company_id,
+    showToastNotifications: data.show_toast_notifications,
+    allowResourceSubstitution: data.allow_resource_substitution,
+    showDetailedInputSection: data.show_detailed_input_section,
+    notificationCategories: data.notification_categories,
+    notificationSpecificMessages: data.notification_specific_messages,
+    viewPreferences: data.view_preferences,
+    updatedAt: data.updated_at
+  };
+};
 
 export interface NotificationSettings {
   categories: Record<string, boolean>;
@@ -64,7 +94,7 @@ class UserSettingsService {
         };
       }
 
-      return settings;
+      return mapSettingsFromDB(settings);
     } catch (error) {
       console.error('Error getting user settings:', error);
       return {
@@ -111,8 +141,14 @@ class UserSettingsService {
       
       // Update the specific setting
       if (type === 'categories') {
+        if (!currentSettings.notificationCategories) {
+          currentSettings.notificationCategories = {};
+        }
         currentSettings.notificationCategories[key] = value;
       } else {
+        if (!currentSettings.notificationSpecificMessages) {
+          currentSettings.notificationSpecificMessages = {};
+        }
         currentSettings.notificationSpecificMessages[key] = value;
       }
 
@@ -133,6 +169,14 @@ class UserSettingsService {
     try {
       // Get current settings
       const currentSettings = await this.getUserSettings(userId, companyId);
+      
+      // Initialize view preferences if missing
+      if (!currentSettings.viewPreferences) {
+        currentSettings.viewPreferences = {
+          market: DEFAULT_VIEW_PREFERENCES,
+          inventory: DEFAULT_VIEW_PREFERENCES
+        };
+      }
       
       // Update view preferences
       if (!currentSettings.viewPreferences[viewName]) {

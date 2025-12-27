@@ -1,28 +1,16 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Header from './components/layout/Header';
 import CompanyOverview from './components/pages/CompanyOverview';
-import Vineyard from './components/pages/Vineyard';
-import Winery from './components/pages/Winery';
-import Sales from './components/pages/Sales';
 import Finance from './components/pages/Finance';
-import { StaffPage } from './components/pages/Staff';
 import { Profile } from './components/pages/Profile';
 import { Settings } from './components/pages/Settings';
 import { AdminDashboard } from './components/pages/AdminDashboard';
 import { Achievements } from './components/pages/Achievements';
-import { WineLog } from './components/pages/WineLog';
-import Winepedia from './components/pages/Winepedia';
 import { Login } from './components/pages/Login';
 import { Highscores } from './components/pages/Highscores';
 import { Toaster } from './components/ui/shadCN/toaster';
-import { ActivityPanel } from './components/layout/ActivityPanel';
-import { LoanWarningModalDisplay } from './components/layout/LoanWarningModalDisplay';
-import { GlobalSearchResultsDisplay } from './components/layout/GlobalSearchResultsDisplay';
-import { useCustomerRelationshipUpdates } from './hooks/useCustomerRelationshipUpdates';
-import { usePrestigeUpdates } from './hooks/usePrestigeAndVineyardValueUpdates';
 import { Company } from '@/lib/database';
-import { setActiveCompany, resetGameState, getCurrentCompany, getCurrentPrestige } from './lib/services/core/gameState';
-import { initializeCustomers, initializeActivitySystem, preloadAllCustomerRelationships } from './lib/services';
+import { setActiveCompany, resetGameState, getCurrentCompany } from './lib/services/core/gameState';
 import { Analytics } from '@vercel/analytics/react';
 
 function App() {
@@ -30,20 +18,12 @@ function App() {
   const [currentCompany, setCurrentCompany] = useState<Company | null>(null);
   const [isGameInitialized, setIsGameInitialized] = useState(false);
   
-  const lastInitializedCompanyIdRef = useRef<string | null>(null);
-  useCustomerRelationshipUpdates();
-  usePrestigeUpdates();
   useEffect(() => {
     const existingCompany = getCurrentCompany();
     if (existingCompany) {
       setCurrentCompany(existingCompany);
       setCurrentPage('company-overview');
       setIsGameInitialized(true);
-      
-      if (lastInitializedCompanyIdRef.current !== existingCompany.id) {
-        lastInitializedCompanyIdRef.current = existingCompany.id;
-        initializeGameForCompany();
-      }
       return;
     }
 
@@ -56,38 +36,11 @@ function App() {
       setCurrentCompany(company);
       setCurrentPage('company-overview');
       setIsGameInitialized(true);
-      
-      if (lastInitializedCompanyIdRef.current !== company.id) {
-        lastInitializedCompanyIdRef.current = company.id;
-        await initializeGameForCompany();
-      }
     } catch (error) {
       console.error('Error setting active company:', error);
     }
   };
 
-  const initializeGameForCompany = async () => {
-    try {
-      // Ensure customers are initialized when a company becomes active
-      const currentPrestige = await getCurrentPrestige();
-      await initializeCustomers(currentPrestige);
-      
-      // Pre-load all customer relationships in the background (non-blocking)
-      // This makes "Show All Customers" load instantly
-      preloadAllCustomerRelationships().catch(error => {
-        console.error('Error preloading customer relationships:', error);
-      });
-      
-      // Initialize activity system
-      await initializeActivitySystem();
-      
-    } catch (error) {
-      console.error('Error initializing game for company:', error);
-
-    } finally {
-
-    }
-  };
 
   const handleBackToLogin = () => {
     resetGameState();
@@ -103,17 +56,6 @@ function App() {
   const handleTimeAdvance = () => {
   };
 
-  // Listen for custom navigation events (e.g., from ShareManagementPanel)
-  useEffect(() => {
-    const handleNavigateToWinepedia = () => {
-      setCurrentPage('winepedia');
-    };
-
-    window.addEventListener('navigateToWinepedia', handleNavigateToWinepedia);
-    return () => {
-      window.removeEventListener('navigateToWinepedia', handleNavigateToWinepedia);
-    };
-  }, []);
 
   const renderCurrentPage = () => {
     if (!currentCompany && currentPage !== 'login' && currentPage !== 'highscores') {
@@ -133,16 +75,8 @@ function App() {
         );
       case 'dashboard':
         return <CompanyOverview onNavigate={setCurrentPage} />;
-      case 'vineyard':
-        return <Vineyard />;
-      case 'winery':
-        return <Winery />;
-      case 'sales':
-        return <Sales onNavigateToWinepedia={() => setCurrentPage('winepedia-customers')} />;
       case 'finance':
         return <Finance />;
-      case 'staff':
-        return <StaffPage title="Staff Management" />;
       case 'profile':
         return (
           <Profile 
@@ -173,12 +107,6 @@ function App() {
             onBack={() => setCurrentPage('company-overview')}
           />
         );
-      case 'wine-log':
-        return (
-          <WineLog
-            currentCompany={currentCompany}
-          />
-        );
       case 'highscores':
         return (
           <Highscores 
@@ -186,10 +114,6 @@ function App() {
             onBack={() => setCurrentPage(currentCompany ? 'company-overview' : 'login')}
           />
         );
-      case 'winepedia':
-        return <Winepedia />;
-      case 'winepedia-customers':
-        return <Winepedia view="customers" />;
       default:
         return currentCompany ? <CompanyOverview onNavigate={handleNavigate} /> : <Login onCompanySelected={handleCompanySelected} />;
     }
@@ -217,21 +141,6 @@ function App() {
       <main className="flex-1 px-3 sm:px-4 md:px-6 lg:px-8 py-4 md:py-6 mx-auto w-full max-w-7xl">
         {renderCurrentPage()}
       </main>
-
-      {/* Activity Panel - only show when logged in */}
-      {isGameInitialized && currentCompany && (
-        <ActivityPanel />
-      )}
-
-      {/* Loan Warning Modal - displays critical loan warnings */}
-      {isGameInitialized && currentCompany && (
-        <LoanWarningModalDisplay />
-      )}
-
-      {/* Global Search Results Modals - displays search results regardless of current page */}
-      {isGameInitialized && currentCompany && (
-        <GlobalSearchResultsDisplay />
-      )}
 
       <Toaster />
 

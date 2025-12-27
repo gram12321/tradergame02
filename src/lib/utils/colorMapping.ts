@@ -1,5 +1,5 @@
-// ===== CONSOLIDATED COLOR MAPPING SYSTEM =====
-// Foundation: 5 core skill colors + system + sub-categories for finer distinctions
+// ===== COLOR MAPPING SYSTEM =====
+// Generic color schemes for consistent styling across the application
 
 /**
  * Color scheme interface for consistent styling across the application
@@ -18,16 +18,13 @@ export interface ColorScheme {
 /**
  * PRIMARY COLOR MAPPING - Foundation of all colors in the game
  * 
- * Hierarchy:
- * - 5 Core Skills (field, winery, administration, sales, maintenance)
- * - System category (for generic system messages)
- * - Sub-categories (variants of main categories for finer distinctions)
+ * Generic color schemes that can be used for any purpose
  */
 export const COLOR_MAPPING: Record<string, ColorScheme> = {
-  // ===== CORE SKILLS (5) =====
+  // ===== PRIMARY COLORS =====
 
-  // Field Work / Vineyard Operations - Green
-  'field': {
+  // Green
+  'green': {
     primary: '#10b981',      // green-500
     background: 'bg-green-50',
     border: 'border-green-200',
@@ -37,8 +34,8 @@ export const COLOR_MAPPING: Record<string, ColorScheme> = {
     ring: 'ring-green-200'
   },
 
-  // Winery Work / Winemaking Process - Purple
-  'winery': {
+  // Purple
+  'purple': {
     primary: '#8b5cf6',      // purple-500
     background: 'bg-purple-50',
     border: 'border-purple-200',
@@ -48,8 +45,8 @@ export const COLOR_MAPPING: Record<string, ColorScheme> = {
     ring: 'ring-purple-200'
   },
 
-  // Finance & Staff (formerly Administration) - Blue
-  'financeAndStaff': {
+  // Blue
+  'blue': {
     primary: '#2563eb',      // blue-600
     background: 'bg-blue-50',
     border: 'border-blue-200',
@@ -59,8 +56,8 @@ export const COLOR_MAPPING: Record<string, ColorScheme> = {
     ring: 'ring-blue-200'
   },
 
-  // Sales & Orders - Orange/Amber
-  'sales': {
+  // Orange
+  'orange': {
     primary: '#f59e0b',      // amber-500
     background: 'bg-orange-50',
     border: 'border-orange-200',
@@ -70,8 +67,8 @@ export const COLOR_MAPPING: Record<string, ColorScheme> = {
     ring: 'ring-orange-200'
   },
 
-  // Administration & Research (formerly Maintenance) - Red
-  'administrationAndResearch': {
+  // Red
+  'red': {
     primary: '#ef4444',      // red-500
     background: 'bg-red-50',
     border: 'border-red-200',
@@ -83,7 +80,7 @@ export const COLOR_MAPPING: Record<string, ColorScheme> = {
 
   // ===== SYSTEM CATEGORY =====
 
-  // System (UI-only, not a game skill) - Gray
+  // System (UI-only) - Gray
   'system': {
     primary: '#6b7280',      // gray-500
     background: 'bg-gray-50',
@@ -94,9 +91,60 @@ export const COLOR_MAPPING: Record<string, ColorScheme> = {
     ring: 'ring-gray-200'
   },
 
-  // ===== SUB-CATEGORIES =====
+  // ===== ADDITIONAL COLORS =====
 
-  // Time & Calendar - Cyan (variant of Finance & Staff)
+  // Cyan
+  'cyan': {
+    primary: '#0ea5e9',      // cyan-500
+    background: 'bg-cyan-50',
+    border: 'border-cyan-200',
+    text: 'text-cyan-700',
+    icon: 'text-cyan-500',
+    badge: 'bg-cyan-100 text-cyan-700 border-cyan-200',
+    ring: 'ring-cyan-200',
+    parent: 'blue'
+  },
+
+  // Amber
+  'amber': {
+    primary: '#f59e0b',      // amber-500
+    background: 'bg-amber-50',
+    border: 'border-amber-200',
+    text: 'text-amber-700',
+    icon: 'text-amber-500',
+    badge: 'bg-amber-100 text-amber-700 border-amber-200',
+    ring: 'ring-amber-200',
+    parent: 'orange'
+  },
+
+  // Indigo
+  'indigo': {
+    primary: '#6366f1',      // indigo-500
+    background: 'bg-indigo-50',
+    border: 'border-indigo-200',
+    text: 'text-indigo-700',
+    icon: 'text-indigo-500',
+    badge: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+    ring: 'ring-indigo-200',
+    parent: 'purple'
+  },
+
+  // ===== NOTIFICATION CATEGORY ALIASES =====
+  // These are aliases for NotificationCategory enum values
+
+  // Finance - Blue
+  'finance': {
+    primary: '#2563eb',      // blue-600
+    background: 'bg-blue-50',
+    border: 'border-blue-200',
+    text: 'text-blue-700',
+    icon: 'text-blue-600',
+    badge: 'bg-blue-100 text-blue-700 border-blue-200',
+    ring: 'ring-blue-200',
+    parent: 'blue'
+  },
+
+  // Time - Cyan
   'time': {
     primary: '#0ea5e9',      // cyan-500
     background: 'bg-cyan-50',
@@ -105,52 +153,16 @@ export const COLOR_MAPPING: Record<string, ColorScheme> = {
     icon: 'text-cyan-500',
     badge: 'bg-cyan-100 text-cyan-700 border-cyan-200',
     ring: 'ring-cyan-200',
-    parent: 'financeAndStaff'
-  },
-
-  // Staff Management - Amber (variant of Finance & Staff)
-  'staff': {
-    primary: '#f59e0b',      // amber-500
-    background: 'bg-amber-50',
-    border: 'border-amber-200',
-    text: 'text-amber-700',
-    icon: 'text-amber-500',
-    badge: 'bg-amber-100 text-amber-700 border-amber-200',
-    ring: 'ring-amber-200',
-    parent: 'financeAndStaff'
-  },
-
-  // Activities & Tasks - Indigo (variant of Administration & Research)
-  'tasks': {
-    primary: '#6366f1',      // indigo-500
-    background: 'bg-indigo-50',
-    border: 'border-indigo-200',
-    text: 'text-indigo-700',
-    icon: 'text-indigo-500',
-    badge: 'bg-indigo-100 text-indigo-700 border-indigo-200',
-    ring: 'ring-indigo-200',
-    parent: 'administrationAndResearch'
+    parent: 'blue'
   }
 };
 
 /**
- * SKILL_COLORS - Convenience constant for the 5 core skill colors
- * Extracted from COLOR_MAPPING for easy access to just the skill colors
+ * Get primary hex color for a color key
+ * Used for coloring UI elements
  */
-export const SKILL_COLORS = {
-  field: COLOR_MAPPING['field'].primary,
-  winery: COLOR_MAPPING['winery'].primary,
-  financeAndStaff: COLOR_MAPPING['financeAndStaff'].primary,
-  sales: COLOR_MAPPING['sales'].primary,
-  administrationAndResearch: COLOR_MAPPING['administrationAndResearch'].primary
-} as const;
-
-/**
- * Get primary hex color for a skill key
- * Used for coloring skill-related UI elements (activity cards, staff bars, etc.)
- */
-export function getSkillColor(skillKey: string): string {
-  return COLOR_MAPPING[skillKey]?.primary || COLOR_MAPPING['system'].primary;
+export function getColor(colorKey: string): string {
+  return COLOR_MAPPING[colorKey]?.primary || COLOR_MAPPING['system'].primary;
 }
 
 /**
@@ -175,3 +187,4 @@ export function getTailwindClasses(colorKey: string): {
     ring: scheme.ring
   };
 }
+

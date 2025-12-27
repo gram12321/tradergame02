@@ -1,15 +1,13 @@
 import { getGameState, updateGameState } from '../core/gameState';
 import type { Transaction } from '@/lib/types/types';
-import { loadVineyards } from '../../database/activities/vineyardDB';
-import { loadWineBatches } from '../../database/activities/inventoryDB';
-import { SEASON_ORDER, TRANSACTION_CATEGORIES, WEEKS_PER_SEASON, WEEKS_PER_YEAR } from '@/lib/constants';
+import { GAME_INITIALIZATION } from '@/lib/constants';
+import { DAYS_PER_MONTH, MONTHS_PER_YEAR } from '@/lib/constants/timeConstants';
 import { CAPITAL_FLOW_TRANSACTION_CATEGORIES } from '@/lib/constants/financeConstants';
-import { getCurrentCompanyId } from '../../utils/companyUtils';
+import { getCurrentCompanyId } from '../core/gameState';
 import { triggerGameUpdate } from '../../../hooks/useGameUpdates';
 import { companyService } from '../user/companyService';
 import { insertTransaction as insertTransactionDB, loadTransactions as loadTransactionsDB, type TransactionData } from '@/lib/database';
-import { calculateTotalOutstandingLoans } from './loanService';
-import { calculateAbsoluteWeeks } from '@/lib/utils/utils';
+import { calculateAbsoluteDays } from '@/lib/utils/utils';
 
 interface FinancialData {
   income: number;
@@ -22,15 +20,7 @@ interface FinancialData {
   fixedAssets: number;
   currentAssets: number;
   buildingsValue: number;
-  allVineyardsValue: number;
-  wineValue: number;
-  grapesValue: number;
-  // Equity components
-  playerContribution: number;
-  familyContribution: number;
-  outsideInvestment: number;
-  retainedEarnings: number;
-  totalEquity: number;
+
 }
 
 let transactionsCache: Transaction[] = [];
@@ -71,10 +61,9 @@ export const addTransaction = async (
       category,
       recurring,
       money: newMoney,
-      week: gameState.week || 1,
-      season: gameState.season || 'Spring',
-      year: gameState.currentYear || 2024,
-      created_at: new Date().toISOString()
+      day: gameState.day || GAME_INITIALIZATION.STARTING_DAY,
+      month: gameState.month || GAME_INITIALIZATION.STARTING_MONTH,
+      year: gameState.year || GAME_INITIALIZATION.STARTING_YEAR
     };
     
     await updateGameState({ money: newMoney });
@@ -90,8 +79,8 @@ export const addTransaction = async (
     const newTransaction: Transaction = {
       id: result.data.id,
       date: {
-        week: result.data.week,
-        season: result.data.season,
+        day: result.data.day,
+        month: result.data.month,
         year: result.data.year
       },
       amount: result.data.amount,
@@ -106,11 +95,9 @@ export const addTransaction = async (
     
     transactionsCache.sort((a, b) => {
       if (a.date.year !== b.date.year) return b.date.year - a.date.year;
-      if (a.date.season !== b.date.season) {
-        return SEASON_ORDER.indexOf(b.date.season) - SEASON_ORDER.indexOf(a.date.season);
-      }
-      if (a.date.week !== b.date.week) return b.date.week - a.date.week;
-      // For same week transactions, sort by ID (newer transactions have higher IDs)
+      if (a.date.month !== b.date.month) return b.date.month - a.date.month;
+      if (a.date.day !== b.date.day) return b.date.day - a.date.day;
+      // For same day transactions, sort by ID (newer transactions have higher IDs)
       return b.id.localeCompare(a.id);
     });
     
@@ -170,9 +157,9 @@ export const clearTransactionsCache = (): void => {
 // Calculate company value (total assets - total liabilities)
 export const calculateCompanyValue = async (): Promise<number> => {
   try {
-    const financialData = await calculateFinancialData('year');
-    const totalOutstandingLoans = await calculateTotalOutstandingLoans();
-    return financialData.totalAssets - totalOutstandingLoans;
+    const financialData = await calculateFinancialData('yearly');
+    // Loan system removed - no outstanding loans to subtract
+    return financialData.totalAssets;
   } catch (error) {
     console.error('Error calculating company value:', error);
     return 0;
@@ -184,7 +171,7 @@ export const calculateNetWorth = calculateCompanyValue;
 
 export const calculateTotalAssets = async (): Promise<number> => {
   try {
-    const financialData = await calculateFinancialData('year');
+    const financialData = await calculateFinancialData('yearly');
     return financialData.totalAssets;
   } catch (error) {
     console.error('Error calculating total assets:', error);
@@ -194,26 +181,22 @@ export const calculateTotalAssets = async (): Promise<number> => {
 
 // Calculate financial data for income statement and balance sheet
 export const calculateFinancialData = async (
-  period: 'weekly' | 'season' | 'year' | 'all',
-  options: { week?: number; season?: string; year?: number } = {}
+  period: 'daily' | 'monthly' | 'yearly' | 'all',
+  options: { day?: number; month?: number; year?: number } = {}
 ): Promise<FinancialData> => {
   const gameState = getGameState();
   
-  const [transactions, vineyards, wineBatches] = await Promise.all([
-    loadTransactions(),
-    loadVineyards(),
-    loadWineBatches()
-  ]);
+  const transactions = await loadTransactions();
   
   const currentDate = {
-    week: gameState.week || 1,
-    season: gameState.season || 'Spring',
-    year: gameState.currentYear || 2024
+    day: gameState.day || GAME_INITIALIZATION.STARTING_DAY,
+    month: gameState.month || GAME_INITIALIZATION.STARTING_MONTH,
+    year: gameState.year || GAME_INITIALIZATION.STARTING_YEAR
   };
   
   const filterDate = {
-    week: options.week ?? currentDate.week,
-    season: options.season ?? currentDate.season,
+    day: options.day ?? currentDate.day,
+    month: options.month ?? currentDate.month,
     year: options.year ?? currentDate.year
   };
   
@@ -268,94 +251,11 @@ export const calculateFinancialData = async (
   
   const buildingsValue = 0;
   
-  const allVineyardsValue = vineyards.reduce((sum, vineyard) => {
-    return sum + vineyard.vineyardTotalValue;
-  }, 0);
-  
-  const wineValue = wineBatches.reduce((sum, batch) => {
-    const stageMultiplier = batch.state === 'bottled' ? 1 :
-                            batch.state === 'must_ready' || batch.state === 'must_fermenting' ? 0.5 : 0.3;
-    const qualityMultiplier = batch.grapeQuality || 0.5;
-    
-    return sum + (batch.quantity * stageMultiplier * qualityMultiplier * (batch.estimatedPrice || 10));
-  }, 0);
-  
-  const grapesValue = wineBatches.reduce((sum, batch) => {
-    if (batch.state !== 'grapes') return sum;
-    
-    const qualityMultiplier = batch.grapeQuality || 0.5;
-    return sum + (batch.quantity * qualityMultiplier * 5);
-  }, 0);
-  
+  // Wine/vineyard asset calculations removed
   const cashMoney = gameState.money || 0;
-  const fixedAssets = buildingsValue + allVineyardsValue;
-  const currentAssets = wineValue + grapesValue;
+  const fixedAssets = buildingsValue;
+  const currentAssets = 0;
   const totalAssets = cashMoney + fixedAssets + currentAssets;
-  
-  // Calculate equity components from all transactions (not filtered by period)
-  let playerContribution = 0;
-  let outsideInvestment = 0;
-  
-  transactions.forEach(transaction => {
-    const description = transaction.description || '';
-    const isInitialInvestmentCategory = transaction.category === TRANSACTION_CATEGORIES.INITIAL_INVESTMENT;
-    const isPositiveCapital = transaction.amount > 0;
-
-    const isPlayerContribution =
-      description === 'Initial Capital: Player cash contribution' ||
-      (isInitialInvestmentCategory && description.includes('Player cash contribution'));
-
-    if (isPlayerContribution) {
-      playerContribution += transaction.amount;
-      return;
-    }
-
-    const isOutsideInvestment =
-      description === 'Public investment committed' ||
-      (isInitialInvestmentCategory && description.includes('Public investment')) ||
-      (isInitialInvestmentCategory && description.startsWith('Stock Issuance'));
-
-    if (isOutsideInvestment && isPositiveCapital) {
-      outsideInvestment += transaction.amount;
-    }
-  });
-  
-  // Family contribution is the initial vineyard value at company creation
-  // Get it from company_shares table
-  const companyId = getCurrentCompanyId();
-  let familyContribution = 0;
-  
-  if (companyId) {
-    const { getCompanyShares } = await import('../../database/core/companySharesDB');
-    const sharesData = await getCompanyShares(companyId);
-    if (sharesData && sharesData.initialVineyardValue) {
-      familyContribution = sharesData.initialVineyardValue;
-    } else {
-      // Fallback: use current vineyard value for companies created before this tracking was added
-      familyContribution = allVineyardsValue;
-    }
-  } else {
-    familyContribution = allVineyardsValue;
-  }
-  
-  // Calculate retained earnings: all-time net income (excluding initial investments and loans)
-  let allTimeIncome = 0;
-  let allTimeExpenses = 0;
-  
-  transactions.forEach(transaction => {
-    const isCapitalFlow = CAPITAL_FLOW_TRANSACTION_CATEGORIES.has(transaction.category);
-    
-    if (!isCapitalFlow) {
-      if (transaction.amount >= 0) {
-        allTimeIncome += transaction.amount;
-      } else {
-        allTimeExpenses += Math.abs(transaction.amount);
-      }
-    }
-  });
-  
-  const retainedEarnings = allTimeIncome - allTimeExpenses;
-  const totalEquity = playerContribution + familyContribution + outsideInvestment + retainedEarnings;
   
   return {
     income,
@@ -367,48 +267,39 @@ export const calculateFinancialData = async (
     totalAssets,
     fixedAssets,
     currentAssets,
-    buildingsValue,
-    allVineyardsValue,
-    wineValue,
-    grapesValue,
-    playerContribution,
-    familyContribution,
-    outsideInvestment,
-    retainedEarnings,
-    totalEquity
+    buildingsValue
   };
 };
 
 /**
- * Subtract weeks from a GameDate, returning the resulting date
+ * Subtract days from a GameDate, returning the resulting date
  */
-function subtractWeeksFromGameDate(
-  date: { week: number; season: string; year: number },
-  weeksToSubtract: number
-): { week: number; season: string; year: number } {
-  // Convert to absolute weeks from game start (2024, Week 1, Spring)
-  const currentAbsoluteWeeks = calculateAbsoluteWeeks(
-    date.week,
-    date.season,
+function subtractDaysFromGameDate(
+  date: { day: number; month: number; year: number },
+  daysToSubtract: number
+): { day: number; month: number; year: number } {
+  // Convert to absolute days from game start
+  const currentAbsoluteDays = calculateAbsoluteDays(
+    date.day,
+    date.month,
     date.year,
-    1, // start week
-    'Spring', // start season
-    2024 // start year
+    GAME_INITIALIZATION.STARTING_DAY,
+    GAME_INITIALIZATION.STARTING_MONTH,
+    GAME_INITIALIZATION.STARTING_YEAR
   );
   
-  // Subtract weeks
-  const targetAbsoluteWeeks = Math.max(1, currentAbsoluteWeeks - weeksToSubtract);
+  // Subtract days
+  const targetAbsoluteDays = Math.max(1, currentAbsoluteDays - daysToSubtract);
   
   // Convert back to GameDate
-  const targetYear = 2024 + Math.floor((targetAbsoluteWeeks - 1) / WEEKS_PER_YEAR);
-  const weeksIntoYear = ((targetAbsoluteWeeks - 1) % WEEKS_PER_YEAR);
-  const targetSeasonIndex = Math.floor(weeksIntoYear / WEEKS_PER_SEASON);
-  const targetWeek = (weeksIntoYear % WEEKS_PER_SEASON) + 1;
-  const targetSeason = SEASON_ORDER[targetSeasonIndex] || 'Spring';
+  const targetYear = GAME_INITIALIZATION.STARTING_YEAR + Math.floor((targetAbsoluteDays - 1) / (DAYS_PER_MONTH * MONTHS_PER_YEAR));
+  const daysIntoYear = ((targetAbsoluteDays - 1) % (DAYS_PER_MONTH * MONTHS_PER_YEAR));
+  const targetMonth = Math.floor(daysIntoYear / DAYS_PER_MONTH) + 1;
+  const targetDay = (daysIntoYear % DAYS_PER_MONTH) + 1;
   
   return {
-    week: targetWeek,
-    season: targetSeason,
+    day: targetDay,
+    month: targetMonth,
     year: targetYear
   };
 }
@@ -418,76 +309,71 @@ function subtractWeeksFromGameDate(
  */
 function isTransactionInDateRange(
   transaction: Transaction,
-  startDate: { week: number; season: string; year: number },
-  endDate: { week: number; season: string; year: number }
+  startDate: { day: number; month: number; year: number },
+  endDate: { day: number; month: number; year: number }
 ): boolean {
-  const transAbsoluteWeeks = calculateAbsoluteWeeks(
-    transaction.date.week,
-    transaction.date.season,
+  const transAbsoluteDays = calculateAbsoluteDays(
+    transaction.date.day,
+    transaction.date.month,
     transaction.date.year,
-    1,
-    'Spring',
-    2024
+    GAME_INITIALIZATION.STARTING_DAY,
+    GAME_INITIALIZATION.STARTING_MONTH,
+    GAME_INITIALIZATION.STARTING_YEAR
   );
   
-  const startAbsoluteWeeks = calculateAbsoluteWeeks(
-    startDate.week,
-    startDate.season,
+  const startAbsoluteDays = calculateAbsoluteDays(
+    startDate.day,
+    startDate.month,
     startDate.year,
-    1,
-    'Spring',
-    2024
+    GAME_INITIALIZATION.STARTING_DAY,
+    GAME_INITIALIZATION.STARTING_MONTH,
+    GAME_INITIALIZATION.STARTING_YEAR
   );
   
-  const endAbsoluteWeeks = calculateAbsoluteWeeks(
-    endDate.week,
-    endDate.season,
+  const endAbsoluteDays = calculateAbsoluteDays(
+    endDate.day,
+    endDate.month,
     endDate.year,
-    1,
-    'Spring',
-    2024
+    GAME_INITIALIZATION.STARTING_DAY,
+    GAME_INITIALIZATION.STARTING_MONTH,
+    GAME_INITIALIZATION.STARTING_YEAR
   );
   
-  return transAbsoluteWeeks >= startAbsoluteWeeks && transAbsoluteWeeks <= endAbsoluteWeeks;
+  return transAbsoluteDays >= startAbsoluteDays && transAbsoluteDays <= endAbsoluteDays;
 }
 
 /**
- * Filter transactions for the last N weeks (rolling window)
+ * Filter transactions for the last N days (rolling window)
  */
-function filterTransactionsLastNWeeks(
+function filterTransactionsLastNDays(
   transactions: Transaction[],
-  currentDate: { week: number; season: string; year: number },
-  weeksBack: number
+  currentDate: { day: number; month: number; year: number },
+  daysBack: number
 ): Transaction[] {
-  const startDate = subtractWeeksFromGameDate(currentDate, weeksBack);
+  const startDate = subtractDaysFromGameDate(currentDate, daysBack);
   return transactions.filter(transaction => 
     isTransactionInDateRange(transaction, startDate, currentDate)
   );
 }
 
 /**
- * Calculate financial data for the last N weeks (rolling window)
+ * Calculate financial data for the last N days (rolling window)
  * More efficient than calling calculateFinancialData multiple times
  */
-export async function calculateFinancialDataRollingNWeeks(
-  weeksBack: number = 48,
-  companyId?: string
+export async function calculateFinancialDataRollingNDays(
+  daysBack: number = 168 // Default: ~7 months (approximately equivalent to 48 weeks)
 ): Promise<FinancialData> {
   const gameState = getGameState();
   const currentDate = {
-    week: gameState.week || 1,
-    season: gameState.season || 'Spring',
-    year: gameState.currentYear || 2024
+    day: gameState.day || GAME_INITIALIZATION.STARTING_DAY,
+    month: gameState.month || GAME_INITIALIZATION.STARTING_MONTH,
+    year: gameState.year || GAME_INITIALIZATION.STARTING_YEAR
   };
   
-  const [transactions, vineyards, wineBatches] = await Promise.all([
-    loadTransactions(),
-    loadVineyards(),
-    loadWineBatches()
-  ]);
+  const transactions = await loadTransactions();
   
   // Filter transactions for the rolling window
-  const filteredTransactions = filterTransactionsLastNWeeks(transactions, currentDate, weeksBack);
+  const filteredTransactions = filterTransactionsLastNDays(transactions, currentDate, daysBack);
   
   let income = 0;
   let expenses = 0;
@@ -537,92 +423,11 @@ export async function calculateFinancialDataRollingNWeeks(
   // Note: Assets are current snapshot values, not historical, so we use current values
   const buildingsValue = 0;
   
-  const allVineyardsValue = vineyards.reduce((sum, vineyard) => {
-    return sum + vineyard.vineyardTotalValue;
-  }, 0);
-  
-  const wineValue = wineBatches.reduce((sum, batch) => {
-    const stageMultiplier = batch.state === 'bottled' ? 1 :
-                            batch.state === 'must_ready' || batch.state === 'must_fermenting' ? 0.5 : 0.3;
-    const qualityMultiplier = batch.grapeQuality || 0.5;
-    
-    return sum + (batch.quantity * stageMultiplier * qualityMultiplier * (batch.estimatedPrice || 10));
-  }, 0);
-  
-  const grapesValue = wineBatches.reduce((sum, batch) => {
-    if (batch.state !== 'grapes') return sum;
-    
-    const qualityMultiplier = batch.grapeQuality || 0.5;
-    return sum + (batch.quantity * qualityMultiplier * 5);
-  }, 0);
-  
+  // Note: Asset calculations removed as they reference wine/vineyard systems
   const cashMoney = gameState.money || 0;
-  const fixedAssets = buildingsValue + allVineyardsValue;
-  const currentAssets = wineValue + grapesValue;
+  const fixedAssets = buildingsValue;
+  const currentAssets = 0;
   const totalAssets = cashMoney + fixedAssets + currentAssets;
-  
-  // Calculate equity components from all transactions (not filtered by period)
-  let playerContribution = 0;
-  let outsideInvestment = 0;
-  
-  transactions.forEach(transaction => {
-    const description = transaction.description || '';
-    const isInitialInvestmentCategory = transaction.category === TRANSACTION_CATEGORIES.INITIAL_INVESTMENT;
-    const isPositiveCapital = transaction.amount > 0;
-
-    const isPlayerContribution =
-      description === 'Initial Capital: Player cash contribution' ||
-      (isInitialInvestmentCategory && description.includes('Player cash contribution'));
-
-    if (isPlayerContribution) {
-      playerContribution += transaction.amount;
-      return;
-    }
-
-    const isOutsideInvestment =
-      description === 'Public investment committed' ||
-      (isInitialInvestmentCategory && description.includes('Public investment')) ||
-      (isInitialInvestmentCategory && description.startsWith('Stock Issuance'));
-
-    if (isOutsideInvestment && isPositiveCapital) {
-      outsideInvestment += transaction.amount;
-    }
-  });
-  
-  const effectiveCompanyId = companyId || getCurrentCompanyId() || '';
-  let familyContribution = 0;
-  
-  if (effectiveCompanyId) {
-    const { getCompanyShares } = await import('../../database/core/companySharesDB');
-    const sharesData = await getCompanyShares(effectiveCompanyId);
-    if (sharesData && sharesData.initialVineyardValue) {
-      familyContribution = sharesData.initialVineyardValue;
-    } else {
-      // Fallback: use current vineyard value for companies created before this tracking was added
-      familyContribution = allVineyardsValue;
-    }
-  } else {
-    familyContribution = allVineyardsValue;
-  }
-  
-  // Calculate retained earnings: all-time net income (excluding initial investments and loans)
-  let allTimeIncome = 0;
-  let allTimeExpenses = 0;
-  
-  transactions.forEach(transaction => {
-    const isCapitalFlow = CAPITAL_FLOW_TRANSACTION_CATEGORIES.has(transaction.category);
-    
-    if (!isCapitalFlow) {
-      if (transaction.amount >= 0) {
-        allTimeIncome += transaction.amount;
-      } else {
-        allTimeExpenses += Math.abs(transaction.amount);
-      }
-    }
-  });
-  
-  const retainedEarnings = allTimeIncome - allTimeExpenses;
-  const totalEquity = playerContribution + familyContribution + outsideInvestment + retainedEarnings;
   
   return {
     income,
@@ -634,34 +439,26 @@ export async function calculateFinancialDataRollingNWeeks(
     totalAssets,
     fixedAssets,
     currentAssets,
-    buildingsValue,
-    allVineyardsValue,
-    wineValue,
-    grapesValue,
-    playerContribution,
-    familyContribution,
-    outsideInvestment,
-    retainedEarnings,
-    totalEquity
+    buildingsValue
   };
 }
 
 // Helper function to filter transactions by time period
 function filterTransactionByPeriod(
   transaction: Transaction,
-  period: 'weekly' | 'season' | 'year' | 'all',
-  currentDate: { week: number; season: string; year: number },
-  options: { week?: number; season?: string; year?: number }
+  period: 'daily' | 'monthly' | 'yearly' | 'all',
+  currentDate: { day: number; month: number; year: number },
+  options: { day?: number; month?: number; year?: number }
 ): boolean {
   switch (period) {
-    case 'weekly':
-      return transaction.date.week === (options.week ?? currentDate.week) &&
-             transaction.date.season === (options.season ?? currentDate.season) &&
+    case 'daily':
+      return transaction.date.day === (options.day ?? currentDate.day) &&
+             transaction.date.month === (options.month ?? currentDate.month) &&
              transaction.date.year === (options.year ?? currentDate.year);
-    case 'season':
-      return transaction.date.season === (options.season ?? currentDate.season) &&
+    case 'monthly':
+      return transaction.date.month === (options.month ?? currentDate.month) &&
              transaction.date.year === (options.year ?? currentDate.year);
-    case 'year':
+    case 'yearly':
       return transaction.date.year === (options.year ?? currentDate.year);
     case 'all':
       return true;

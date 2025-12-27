@@ -104,13 +104,14 @@ return (
 - Management: Manual SQL migrations via `migrations/` (data-preserving or full reset)
 - Usage: `winemaker-omega.vercel.app` (stable for testing)
 
-**Migration Process:**
+**Migration Process (for tradergame02):**
 1. Update dev database via MCP tools
-2. Choose migration type:
-   - **Data-preserving**: `migrations/vercel_migration_preserve_data.sql` (recommended for regular updates)
-   - **Full reset**: `migrations/sync_vercel_schema.sql` (major breaking changes only)
-3. Run chosen migration in Vercel Supabase SQL Editor
-4. Verify Vercel deployment works
+2. Use initial schema: `migrations/tradergame02_initial_schema.sql` (for new database setup)
+3. For future production sync: Create new migration files based on `tradergame02_initial_schema.sql`
+4. Run migration in Supabase SQL Editor
+5. Verify deployment works
+
+**Note:** The old Winemaker game migration files have been removed. New migration files will be created as needed for tradergame02 production deployments.
 
 ### 🔐 Row Level Security & Access Controls
 - All company-scoped tables now enforce RLS. Access requires either the company owner (`companies.user_id`) or a membership row in `user_settings` for the target `company_id`.

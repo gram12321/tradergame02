@@ -15,9 +15,7 @@ import {
 } from "@/components/ui";
 import { IncomeBalanceView } from './IncomeBalanceView';
 import { CashFlowView } from './CashFlowView';
-import { ResearchPanel } from './ResearchPanel';
-import { StaffWageSummary } from './StaffWageSummary';
-import LoansView from './LoansView';
+
 import { FINANCE_TAB_STYLES, FINANCE_BUTTON_STYLES } from '@/lib/constants/financeConstants';
 import { MONTHS_PER_YEAR } from '@/lib/constants/timeConstants';
 import { useGameState, useGameStateWithData } from '@/hooks';
@@ -29,7 +27,7 @@ export default function FinanceView() {
   const gameState = useGameState();
   const transactions = useGameStateWithData(loadTransactions, []);
 
-  const currentYear = gameState.currentYear ?? new Date().getFullYear();
+  const currentYear = gameState.year ?? new Date().getFullYear();
   const currentMonth = gameState.month ?? 1;
 
   const [selectedYear, setSelectedYear] = useState(() => currentYear);
@@ -231,17 +229,16 @@ export default function FinanceView() {
         <TabsContent value="income">
           <div className="space-y-6">
             <IncomeBalanceView period={activePeriod} filters={periodFilters} />
-            <StaffWageSummary />
           </div>
         </TabsContent>
         <TabsContent value="cashflow">
           <CashFlowView />
         </TabsContent>
         <TabsContent value="loans">
-          <LoansView />
+          <></>
         </TabsContent>
         <TabsContent value="upgrades">
-          <ResearchPanel />
+          <></>
         </TabsContent>
       </Tabs>
     </div>

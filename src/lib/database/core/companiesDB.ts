@@ -1,75 +1,39 @@
 import { supabase } from './supabase';
-import { toOptionalString } from '../dbMapperUtils';
 
 const COMPANIES_TABLE = 'companies';
 
-export interface Company {
-  id: string;
-  name: string;
-  userId?: string;
-  foundedYear: number;
-  currentDay: number;    // 1-24 (Day-Month-Year system)
-  currentMonth: number;  // 1-7
-  currentYear: number;
-  money: number;
-  prestige: number;
-  lastPlayed: Date;
-  createdAt: Date;
-  updatedAt: Date;
-  startingCountry?: string; // Starting country for companies using new starting conditions system
-  // Note: Share-related data is stored in company_shares table
-  // Use getCompanyShares() from companySharesDB to access share data
-}
-
-/**
- * Map database row to Company
- * Reads share data from company_shares table
- */
-async function mapCompanyFromDB(dbCompany: any): Promise<Company> {
-  // Core company fields
-  const company: Company = {
-    id: dbCompany.id,
-    name: dbCompany.name,
-    userId: dbCompany.user_id,
-    foundedYear: dbCompany.founded_year,
-    currentDay: dbCompany.current_day,
-    currentMonth: dbCompany.current_month,
-    currentYear: dbCompany.current_year,
-    money: dbCompany.money,
-    prestige: dbCompany.prestige,
-    lastPlayed: dbCompany.last_played ? new Date(dbCompany.last_played) : new Date(),
-    createdAt: new Date(dbCompany.created_at),
-    updatedAt: new Date(dbCompany.updated_at),
-    startingCountry: toOptionalString(dbCompany.starting_country)
-  };
-
-  // Share data is stored separately in company_shares table
-  // Access via getCompanyShares() when needed
-
-  return company;
-}
-
 /**
  * Companies Database Operations
- * Pure CRUD operations for company data persistence
+ * Basic CRUD operations for company data persistence
+ * Simplified: Each user has exactly one company (1:1 relationship)
  */
 
 export interface CompanyData {
   id?: string;
   name: string;
-  user_id?: string | null;
-  founded_year: number;
-  current_day: number;    // 1-24 (Day-Month-Year system)
-  current_month: number;  // 1-7
-  current_year: number;
-  money: number;
-  prestige: number;
-  last_played?: string;
+  user_id: string; // Required - 1:1 relationship with user
+  current_day?: number;
+  current_month?: number;
+  current_year?: number;
+  money?: number;
   starting_country?: string;
-  // Note: Share-related fields are now in company_shares table
-  // Use createCompanyShares() and updateCompanyShares() for share data
 }
 
+// Company type (same as CompanyData, using camelCase property names)
+export type Company = {
+  id: string;
+  name: string;
+  userId: string;
+  currentDay: number;
+  currentMonth: number;
+  currentYear: number;
+  money: number;
+  startingCountry?: string;
+};
+
+/**
+ * Insert a new company
+ */
 export const insertCompany = async (companyData: CompanyData): Promise<{ success: boolean; data?: any; error?: string }> => {
   try {
     const { data, error } = await supabase
@@ -89,6 +53,9 @@ export const insertCompany = async (companyData: CompanyData): Promise<{ success
   }
 };
 
+/**
+ * Get company by ID
+ */
 export const getCompanyById = async (companyId: string): Promise<Company | null> => {
   try {
     const { data, error } = await supabase
@@ -97,30 +64,56 @@ export const getCompanyById = async (companyId: string): Promise<Company | null>
       .eq('id', companyId)
       .single();
 
-    if (error) return null;
-    return data ? await mapCompanyFromDB(data) : null;
+    if (error || !data) return null;
+
+    return {
+      id: data.id!,
+      name: data.name,
+      userId: data.user_id,
+      currentDay: data.current_day || 1,
+      currentMonth: data.current_month || 1,
+      currentYear: data.current_year || 2024,
+      money: data.money || 0,
+      startingCountry: data.starting_country
+    };
   } catch (error) {
     console.error('Error getting company by ID:', error);
     return null;
   }
 };
 
-export const getCompanyByName = async (name: string): Promise<Company | null> => {
+/**
+ * Get user's company (1:1 relationship - each user has exactly one company)
+ */
+export const getUserCompany = async (userId: string): Promise<Company | null> => {
   try {
     const { data, error } = await supabase
       .from(COMPANIES_TABLE)
       .select('*')
-      .eq('name', name)
-      .single();
+      .eq('user_id', userId)
+      .maybeSingle();
 
-    if (error) return null;
-    return data ? await mapCompanyFromDB(data) : null;
+    if (error || !data) return null;
+
+    return {
+      id: data.id!,
+      name: data.name,
+      userId: data.user_id,
+      currentDay: data.current_day || 1,
+      currentMonth: data.current_month || 1,
+      currentYear: data.current_year || 2024,
+      money: data.money || 0,
+      startingCountry: data.starting_country
+    };
   } catch (error) {
-    console.error('Error getting company by name:', error);
+    console.error('Error getting user company:', error);
     return null;
   }
 };
 
+/**
+ * Check if company name exists
+ */
 export const checkCompanyNameExists = async (name: string): Promise<boolean> => {
   try {
     const { data, error } = await supabase
@@ -136,44 +129,12 @@ export const checkCompanyNameExists = async (name: string): Promise<boolean> => 
   }
 };
 
-export const getUserCompanies = async (userId: string): Promise<Company[]> => {
-  try {
-    const { data, error } = await supabase
-      .from(COMPANIES_TABLE)
-      .select('*')
-      .eq('user_id', userId)
-      .order('last_played', { ascending: false });
-
-    if (error) return [];
-    return await Promise.all((data || []).map(dbCompany => mapCompanyFromDB(dbCompany)));
-  } catch (error) {
-    console.error('Error getting user companies:', error);
-    return [];
-  }
-};
-
-export const getAllCompanies = async (limit: number = 50): Promise<Company[]> => {
-  try {
-    const { data, error} = await supabase
-      .from(COMPANIES_TABLE)
-      .select('*')
-      .order('last_played', { ascending: false })
-      .limit(limit);
-
-    if (error) return [];
-    return await Promise.all((data || []).map(dbCompany => mapCompanyFromDB(dbCompany)));
-  } catch (error) {
-    console.error('Error getting all companies:', error);
-    return [];
-  }
-};
-
+/**
+ * Update company
+ */
 export const updateCompany = async (companyId: string, updates: Partial<CompanyData>): Promise<{ success: boolean; error?: string }> => {
   try {
-    const updateData: any = {
-      last_played: new Date().toISOString(),
-      ...updates
-    };
+    const updateData: any = { ...updates };
 
     const { error } = await supabase
       .from(COMPANIES_TABLE)
@@ -191,6 +152,9 @@ export const updateCompany = async (companyId: string, updates: Partial<CompanyD
   }
 };
 
+/**
+ * Delete company
+ */
 export const deleteCompany = async (companyId: string): Promise<{ success: boolean; error?: string }> => {
   try {
     const { error } = await supabase
@@ -208,22 +172,3 @@ export const deleteCompany = async (companyId: string): Promise<{ success: boole
     return { success: false, error: error.message || 'An unexpected error occurred' };
   }
 };
-
-export const getCompanyStats = async (userId?: string): Promise<any[]> => {
-  try {
-    let query = supabase.from(COMPANIES_TABLE).select('money, current_week, current_year');
-    
-    if (userId) {
-      query = query.eq('user_id', userId);
-    }
-
-    const { data, error } = await query;
-
-    if (error) return [];
-    return data || [];
-  } catch (error) {
-    console.error('Error getting company stats:', error);
-    return [];
-  }
-};
-

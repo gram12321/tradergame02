@@ -79,15 +79,7 @@ export const DEFAULT_FINANCIAL_DATA = {
   totalAssets: 0,
   fixedAssets: 0,
   currentAssets: 0,
-  buildingsValue: 0,
-  allVineyardsValue: 0,
-  wineValue: 0,
-  grapesValue: 0,
-  playerContribution: 0,
-  familyContribution: 0,
-  outsideInvestment: 0,
-  retainedEarnings: 0,
-  totalEquity: 0
+  buildingsValue: 0
 } as const;
 
 // Financial section titles by period

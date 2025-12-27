@@ -3,9 +3,8 @@ import { useLoadingState } from '@/hooks';
 import { SimpleCard, Button, Label, Input, Tabs, TabsContent, TabsList, TabsTrigger, Card, CardContent, CardDescription, CardHeader, CardTitle, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui';
 import { Settings, Users, AlertTriangle, Trash2 } from 'lucide-react';
 import { PageProps, NavigationProps } from '../../lib/types/UItypes';
-import TestViewer from '../../../test-viewer/TestViewer';
 import {
-  adminSetGoldToCompany, adminSetPlayerBalance, adminAddPrestigeToCompany, adminClearAllHighscores, adminClearCompanyValueHighscores, adminClearCompanyValuePerWeekHighscores, adminClearAllCompanies, adminClearAllUsers, adminClearAllCompaniesAndUsers, adminRecreateCustomers, adminGenerateTestOrders, adminGenerateTestContract, adminClearAllAchievements, adminFullDatabaseReset, adminSetGameDate, adminGrantAllResearch, adminRemoveAllResearch
+  adminSetGoldToCompany, adminClearAllHighscores, adminClearCompanyValueHighscores, adminClearAllCompanies, adminClearAllUsers, adminClearAllCompaniesAndUsers, adminFullDatabaseReset, adminSetGameDate
 } from '@/lib/services';
 import { GAME_INITIALIZATION } from '@/lib/constants';
 import { DAYS_PER_MONTH, MONTHS_PER_YEAR } from '@/lib/constants/timeConstants';
@@ -16,8 +15,6 @@ interface AdminDashboardProps extends PageProps, NavigationProps {
 export function AdminDashboard({ onBack, onNavigateToLogin }: AdminDashboardProps) {
   const { isLoading, withLoading } = useLoadingState();
   const [goldAmount, setGoldAmount] = useState('10000');
-  const [playerBalanceAmount, setPlayerBalanceAmount] = useState('10000');
-  const [prestigeAmount, setPrestigeAmount] = useState('100');
   const [gameDay, setGameDay] = useState(String(GAME_INITIALIZATION.STARTING_DAY));
   const [gameMonth, setGameMonth] = useState(String(GAME_INITIALIZATION.STARTING_MONTH));
   const [gameYear, setGameYear] = useState(String(GAME_INITIALIZATION.STARTING_YEAR));
@@ -29,22 +26,6 @@ export function AdminDashboard({ onBack, onNavigateToLogin }: AdminDashboardProp
   const handleSetGold = () => withLoading(async () => {
     const amount = parseFloat(goldAmount) || 10000;
     await adminSetGoldToCompany(amount);
-  });
-
-  const handleSetPlayerBalance = () => withLoading(async () => {
-    const amount = parseFloat(playerBalanceAmount) || 10000;
-    const result = await adminSetPlayerBalance(amount);
-    if (result.success) {
-      console.log(result.message);
-    } else {
-      console.error(result.error || 'Failed to set player balance');
-      alert(result.error || 'Failed to set player balance');
-    }
-  });
-
-  const handleAddPrestige = () => withLoading(async () => {
-    const amount = parseFloat(prestigeAmount) || 100;
-    await adminAddPrestigeToCompany(amount);
   });
 
 
@@ -76,16 +57,6 @@ export function AdminDashboard({ onBack, onNavigateToLogin }: AdminDashboardProp
     setGameYear(String(safeYear));
   });
 
-  const handleGrantAllResearch = () => withLoading(async () => {
-    const result = await adminGrantAllResearch();
-    console.log(`Research granted: ${result.unlocked} unlocked, ${result.alreadyUnlocked} already unlocked`);
-  });
-
-  const handleRemoveAllResearch = () => withLoading(async () => {
-    const result = await adminRemoveAllResearch();
-    console.log(`Research removed: ${result.removed} unlocks removed`);
-  });
-
   const handleClearAllHighscores = () => withLoading(async () => {
     await adminClearAllHighscores();
   });
@@ -93,11 +64,6 @@ export function AdminDashboard({ onBack, onNavigateToLogin }: AdminDashboardProp
   const handleClearCompanyValueHighscores = () => withLoading(async () => {
     await adminClearCompanyValueHighscores();
   });
-
-  const handleClearCompanyValuePerWeekHighscores = () => withLoading(async () => {
-    await adminClearCompanyValuePerWeekHighscores();
-  });
-
 
   // Database cleanup functions
   const handleClearAllCompanies = () => withLoading(async () => {
@@ -133,25 +99,6 @@ export function AdminDashboard({ onBack, onNavigateToLogin }: AdminDashboardProp
     }, 1000);
   });
 
-
-
-  const handleRecreateCustomers = () => withLoading(async () => {
-    await adminRecreateCustomers();
-  });
-
-  const handleGenerateTestOrder = () => withLoading(async () => {
-    await adminGenerateTestOrders();
-  });
-
-  const handleGenerateTestContract = () => withLoading(async () => {
-    await adminGenerateTestContract();
-  });
-
-  const handleClearAllAchievements = () => withLoading(async () => {
-    await adminClearAllAchievements();
-  });
-
-
   const handleFullDatabaseReset = () => withLoading(async () => {
     await adminFullDatabaseReset();
     // Navigate to login and refresh browser
@@ -185,11 +132,10 @@ export function AdminDashboard({ onBack, onNavigateToLogin }: AdminDashboardProp
 
 
       <Tabs defaultValue="database" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="database">Database</TabsTrigger>
           <TabsTrigger value="cheats">Cheats</TabsTrigger>
           <TabsTrigger value="tools">Tools</TabsTrigger>
-          <TabsTrigger value="tests">Tests</TabsTrigger>
         </TabsList>
 
         {/* Database Management */}
@@ -255,43 +201,9 @@ export function AdminDashboard({ onBack, onNavigateToLogin }: AdminDashboardProp
                 >
                   Clear Company Value Highscores
                 </Button>
-
-                <Button
-                  variant="outline"
-                  onClick={handleClearCompanyValuePerWeekHighscores}
-                  disabled={isLoading}
-                  className="w-full"
-                >
-                  Clear Company Value Per Week Highscores
-                </Button>
               </SimpleCard>
             </div>
 
-            {/* System Data Cleanup */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <SimpleCard
-                title="System Data"
-                description="Clear system and progression data"
-              >
-                <Button
-                  variant="destructive"
-                  onClick={handleRecreateCustomers}
-                  disabled={isLoading}
-                  className="w-full"
-                >
-                  👥 Clear & Recreate All Customers
-                </Button>
-
-                <Button
-                  variant="destructive"
-                  onClick={handleClearAllAchievements}
-                  disabled={isLoading}
-                  className="w-full"
-                >
-                  🏆 Clear All Achievements
-                </Button>
-              </SimpleCard>
-            </div>
 
             {/* Full Database Reset */}
             <Card className="border-destructive bg-destructive/10">
@@ -349,44 +261,6 @@ export function AdminDashboard({ onBack, onNavigateToLogin }: AdminDashboardProp
                 </Button>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="playerBalanceAmount">Player Balance Amount to Set</Label>
-                <Input
-                  id="playerBalanceAmount"
-                  type="number"
-                  value={playerBalanceAmount}
-                  onChange={(e) => setPlayerBalanceAmount(e.target.value)}
-                  placeholder="10000"
-                />
-                <Button
-                  onClick={handleSetPlayerBalance}
-                  disabled={isLoading}
-                  className="w-full"
-                >
-                  Set Player Balance
-                </Button>
-                <p className="text-xs text-gray-500">
-                  Sets the cash balance for the user associated with the active company
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="prestigeAmount">Prestige Amount</Label>
-                <Input
-                  id="prestigeAmount"
-                  type="number"
-                  value={prestigeAmount}
-                  onChange={(e) => setPrestigeAmount(e.target.value)}
-                  placeholder="100"
-                />
-                <Button
-                  onClick={handleAddPrestige}
-                  disabled={isLoading}
-                  className="w-full"
-                >
-                  Add Prestige to Active Company
-                </Button>
-              </div>
             </SimpleCard>
 
             <SimpleCard
@@ -453,81 +327,21 @@ export function AdminDashboard({ onBack, onNavigateToLogin }: AdminDashboardProp
               </div>
             </SimpleCard>
 
-            <SimpleCard
-              title="Research Management"
-              description="Grant or remove all research projects"
-            >
-              <Button
-                onClick={handleGrantAllResearch}
-                disabled={isLoading}
-                className="w-full"
-              >
-                🔬 Grant All Research
-              </Button>
-              <p className="text-xs text-gray-500 mt-2">
-                Unlocks all research projects for the active company
-              </p>
-
-              <Button
-                variant="destructive"
-                onClick={handleRemoveAllResearch}
-                disabled={isLoading}
-                className="w-full mt-4"
-              >
-                🗑️ Remove All Research
-              </Button>
-              <p className="text-xs text-gray-500 mt-2">
-                Removes all research unlocks from the active company
-              </p>
-            </SimpleCard>
-
           </div>
         </TabsContent>
-
 
         {/* Development Tools */}
         <TabsContent value="tools">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <SimpleCard
-              title="Order Testing"
-              description="Generate test orders for development and testing"
+              title="Tools"
+              description="Development and testing tools"
             >
-              <Button
-                onClick={handleGenerateTestOrder}
-                disabled={isLoading}
-                className="w-full"
-              >
-                🛒 Generate Test Order
-              </Button>
-              <p className="text-xs text-gray-500 mt-2">
-                Bypasses prestige checks to force order generation
+              <p className="text-xs text-gray-500">
+                Tools will be added here as needed
               </p>
             </SimpleCard>
-
-            <SimpleCard
-              title="Contract Testing"
-              description="Generate test contracts for development and testing"
-            >
-              <Button
-                onClick={handleGenerateTestContract}
-                disabled={isLoading}
-                className="w-full"
-              >
-                📋 Generate Test Contract
-              </Button>
-              <p className="text-xs text-gray-500 mt-2">
-                Bypasses relationship/prestige checks to force contract generation
-              </p>
-            </SimpleCard>
-
-
           </div>
-
-        </TabsContent>
-
-        {/* Test Viewer */}
-        <TabsContent value="tests">
-          <TestViewer />
         </TabsContent>
       </Tabs>
     </div>

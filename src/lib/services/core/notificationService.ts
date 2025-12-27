@@ -14,8 +14,8 @@ import { NotificationCategory } from "@/lib/types/types";
 
 export interface PlayerNotification {
   id: string;
-  gameWeek: number;
-  gameSeason: string;
+  gameDay: number;
+  gameMonth: number;
   gameYear: number;
   text: string;
   origin: string;
@@ -41,8 +41,8 @@ async function loadFromDbIfNeeded() {
     const records = await loadNotifications();
     notifications = records.map(r => ({
       id: r.id,
-      gameWeek: r.game_week,
-      gameSeason: r.game_season,
+      gameDay: r.game_day,
+      gameMonth: r.game_month,
       gameYear: r.game_year,
       text: r.text,
       origin: r.origin,
@@ -122,14 +122,15 @@ export const notificationService = {
       : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
     const gameState = getGameState();
-    const gameWeek = gameState.week || 1;
-    const gameSeason = gameState.season || 'Spring';
-    const gameYear = gameState.currentYear || 2024;
+    const { GAME_INITIALIZATION } = await import('@/lib/constants');
+    const gameDay = gameState.day || GAME_INITIALIZATION.STARTING_DAY;
+    const gameMonth = gameState.month || GAME_INITIALIZATION.STARTING_MONTH;
+    const gameYear = gameState.year || GAME_INITIALIZATION.STARTING_YEAR;
 
     const message: PlayerNotification = {
       id,
-      gameWeek,
-      gameSeason,
+      gameDay,
+      gameMonth,
       gameYear,
       text,
       origin,
@@ -142,8 +143,8 @@ export const notificationService = {
 
     saveNotification({
       id,
-      game_week: gameWeek,
-      game_season: gameSeason,
+      game_day: gameDay,
+      game_month: gameMonth,
       game_year: gameYear,
       text,
       origin,

@@ -2,8 +2,7 @@
 export * from './core/gamestateDB';
 export * from './core/highscoresDB';
 export * from './core/companiesDB';
-export * from './core/usersDB';
 export * from './core/transactionsDB';
-export * from './core/userSettingsDB';
+export * from './core/companySettingsDB';
 
 export { supabase } from './core/supabase';

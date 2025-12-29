@@ -8,10 +8,10 @@ import { formatNumber, formatGameDate } from '@/lib/utils';
 import { PageProps, CompanyProps } from '../../lib/types/UItypes';
 
 interface HighscoresProps extends PageProps, CompanyProps {
-  // Inherits currentCompanyId and onBack from shared interfaces
+  // Inherits currentCompanyName and onBack from shared interfaces
 }
 
-export function Highscores({ currentCompanyId, onBack }: HighscoresProps) {
+export function Highscores({ currentCompanyName, onBack }: HighscoresProps) {
   const { isLoading, withLoading } = useLoadingState();
   const [highscores, setHighscores] = useState<HighscoreEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -123,15 +123,15 @@ export function Highscores({ currentCompanyId, onBack }: HighscoresProps) {
                 <TableBody>
                   {highscores.map((score, index) => (
                     <TableRow 
-                      key={`${score.companyId}-${index}`}
-                      className={currentCompanyId === score.companyId ? 'bg-primary/5 border-primary/20' : ''}
+                      key={`${score.companyName}-${index}`}
+                      className={currentCompanyName === score.companyName ? 'bg-primary/5 border-primary/20' : ''}
                     >
                       <TableCell className="font-medium">
                         {index + 1}
                       </TableCell>
                       <TableCell className="font-medium">
                         {score.companyName}
-                        {currentCompanyId === score.companyId && (
+                        {currentCompanyName === score.companyName && (
                           <span className="ml-2 text-xs text-muted-foreground">(Your Company)</span>
                         )}
                       </TableCell>

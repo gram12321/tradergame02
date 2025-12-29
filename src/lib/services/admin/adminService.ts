@@ -49,31 +49,6 @@ export async function adminClearAllCompanies(): Promise<void> {
   if (error) throw error;
 }
 
-/**
- * Clear all users from database
- */
-export async function adminClearAllUsers(): Promise<void> {
-  const { error } = await supabase.from('users').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-  if (error) throw error;
-}
-
-/**
- * Clear all companies and users from database
- */
-export async function adminClearAllCompaniesAndUsers(): Promise<void> {
-  try {
-    // Clear companies first (due to foreign key constraints)
-    const { error: companiesError } = await supabase.from('companies').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    if (companiesError) throw companiesError;
-
-    // Then clear users
-    const { error: usersError } = await supabase.from('users').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    if (usersError) throw usersError;
-  } catch (error) {
-    console.error('Error clearing companies and users:', error);
-    throw error;
-  }
-}
 
 
 
@@ -87,7 +62,7 @@ interface AdminGameDatePayload {
  * Set the game date (day, month, year) for the active company
  */
 export async function adminSetGameDate({ day, month, year }: AdminGameDatePayload): Promise<void> {
-  const { DAYS_PER_MONTH, MONTHS_PER_YEAR } = await import('../../constants/timeConstants');
+  const { DAYS_PER_MONTH, MONTHS_PER_YEAR } = await import('../../constants/constants');
   
   const normalizedDay = Number.isFinite(day)
     ? Math.min(Math.max(Math.floor(day), 1), DAYS_PER_MONTH)
@@ -122,9 +97,8 @@ export async function adminFullDatabaseReset(): Promise<void> {
       'highscores',            // References companies
       'transactions',          // References companies
       'game_state',            // References companies (id is FK to companies.id)
-      'user_settings',         // References users and companies
-      'companies',             // References users
-      'users'                  // Top-level parent table
+      'company_settings',      // References companies
+      'companies'              // Top-level parent table
     ];
 
     const errors: string[] = [];

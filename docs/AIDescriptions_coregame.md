@@ -1,168 +1,94 @@
-# Core Game Mechanics - Winery Management Game
+# TraderGame Framework - Core Architecture
 
-## 🎯 Current Implementation Status
+## 🎯 Overview
 
-This document describes what has been **actually implemented** in the Winery Management Game as of version 0.0351.
+Minimal framework extracted from Winemaker04, providing core infrastructure for building a trading game. Contains NO game-specific mechanics - only essential infrastructure.
 
-## 🏗️ Core Game Architecture
+## 🏗️ Core Systems
 
-### Game State Management ✅ **IMPLEMENTED**
-- **Central State**: `src/lib/services/core/gameState.ts` - manages time, money, prestige, company data
-- **Time System**: Week-based progression (manual advancement only)
-- **Data Persistence**: `src/lib/database/database.ts` - Supabase integration with company-scoped data
-- **Real-time Updates**: `src/hooks/useGameUpdates.ts` - Supabase subscriptions
-- **Company System**: Multi-company support with company switching and data isolation
+### Game State Management
+- **File**: `src/lib/services/core/gameState.ts`
+- **Function**: Manages time (day/month/year), money, company data
+- **Time System**: Manual advancement via `processGameTick()`
+- **Update System**: `src/hooks/useGameUpdates.ts` - Global updates with debouncing
 
-## 🌱 Core Game Systems
+### User & Company System (1:1 Relationship)
+- **Files**: `src/lib/services/user/authService.ts`, `src/lib/services/user/companyService.ts`
+- **Relationship**: Each user has exactly one company (company name = username)
+- **Login**: `src/components/pages/Login.tsx` - Company name-based login/creation
+- **Storage**: Previously used companies tracked in localStorage
 
-### 1. Time Progression System ✅ **IMPLEMENTED**
-**What's Implemented**:
-- **Game Time**: `{ week, season, year }` interface with automatic season (every 12 weeks) and year changes. in `src/lib/types/types.ts`
-- **Function**: `processGameTick()` in `src/lib/services/core/gameTick.ts` - handles week/season/year progression
-- **Game Tick System**: Weekly order generation, activity progression, vine aging, prestige updates
+### Database Schema
+**Tables**:
+- `users` - User accounts (name, email, avatar)
+- `companies` - Company data (1:1 with users, includes time/money)
+- `game_state` - Company-scoped state snapshot
+- `transactions` - Financial transaction history
+- `notifications` - Company-scoped notifications
+- `notification_filters` - User-defined filters
+- `highscores` - Global leaderboards
+- `user_settings` - Company settings
 
-**What's NOT Implemented**:
-- ❌ **Seasonal Effects**: No automatic seasonal effects on vineyards/wine
+**Pattern**: All tables use `company_id` for data isolation with RLS policies
 
-### 2. Vineyard System ✅ **IMPLEMENTED**
-**What's Implemented**:
-- **Vineyard Interface**: Complete vineyard interface with health system, overgrowth tracking, and clearing activities
-- **Land Buying System**: `src/lib/services/vineyard/landSearchService.ts` - Sophisticated land search and acquisition
-- **Health System**: Vineyard health tracking with interactive tooltips and health-aware activities
-- **Clearing System**: `src/lib/services/vineyard/clearingService.ts` - Clearing/uprooting activities with health impact
-- **Overgrowth System**: Task-specific overgrowth tracking (vegetation, debris, uproot, replant)
-- **Key Functions**:
-  - `purchaseVineyard()`: Buy vineyards with realistic property generation
-  - `plantVineyard()`: Plant grape varieties with activity system integration
-  - `harvestVineyard()`: Collect grapes with harvest characteristics system
-  - `calculateVineyardYield()`: Sophisticated yield calculation with vine age progression
-- **UI**: `src/components/pages/Vineyard.tsx` - Complete vineyard management with health display
-- **Vine Yield System**: Age-based progression (0.02→1.00→decline) with yearly updates
-- **Ripeness System**: Seasonal ripeness progression with aspect/randomness modifiers
-** VineyardModal.ts for detailed UI for users 
+### Finance System
+- **File**: `src/lib/services/finance/financeService.ts`
+- **Function**: Transaction tracking (amount, description, category)
+- **UI**: `src/components/finance/FinanceView.tsx`
 
-### 3. Wine Production System ✅ **IMPLEMENTED**
-**What's Implemented**:
-- **WineBatch Interface**: Complete wine batch tracking with characteristics and wine features
-- **Wine Features Framework**: Config-driven wine features (oxidation, terroir, stuck fermentation, bottle aging, late harvest)
-- **Winery Service**: Production operations with feature risk tracking
-- **Dual Tracking System**:
-  - **Stage**: `'grapes' | 'must' | 'wine' | 'bottled'` (material state)
-  - **Process**: `'none' | 'fermentation' | 'aging' | 'bottled'` (current activity)
-- **Key Functions**:
-  - `createWineBatchFromHarvest()`: Create from harvest with harvest characteristics system
-  - `crushGrapes()`: Convert grapes to must (stage: grapes→must)
-  - `startFermentation()`: Begin fermentation (process: none→fermentation)
-  - `stopFermentation()`: Complete fermentation (stage: must→wine, process: fermentation→aging)
-  - `bottleWine()`: Complete production (stage: wine→bottled, process: aging→bottled)
-  - `progressFermentation()`: Manual fermentation progress control
-- **UI**: `src/components/pages/Winery.tsx` - Complete winery operations with wine features display
-**What's NOT Implemented**:
-- ❌ **Storage Locations**: No storage vessel tracking. Fermentation tank, ageing tanks, grape containers ect
+### Notification System
+- **File**: `src/lib/services/core/notificationService.ts`
+- **Function**: Centralized notifications with database persistence and filtering
 
-### 4. Sales System ✅ **IMPLEMENTED**
-**What's Implemented**:
-- **Sales Service**: `src/lib/services/sales/salesService.ts` - Complete sales system
-- **Customer System**: `src/lib/services/sales/createCustomer.ts` - Regional customer generation
-- **Order Generation**: `src/lib/services/sales/generateOrder.ts` - Sophisticated order creation
-- **Pricing Service**: `src/lib/services/sales/pricingService.ts` - Multi-factor pricing
-- **WineOrder Interface**: `src/lib/types/types.ts` - Order management with customer data
-- **Customer Interface**: `src/lib/types/types.ts` - Regional customer characteristics
-- **Properties**: `id`, `orderedAt`, `customerType`, `wineBatchId`, `wineName`, `requestedQuantity`, `offeredPrice`, `totalValue`, `status`, `customerId`, `customerName`, `customerCountry`, `customerRelationship`
-- **Customer Types**: `'Restaurant' | 'Wine Shop' | 'Private Collector' | 'Chain Store'`
-- **Regional System**: 5 countries with country-specific characteristics (purchasing power, wine tradition, market share)
-- **Key Functions**:
-  - `generateSophisticatedWineOrders()`: Create orders with customer browsing and rejection logic
-  - `fulfillWineOrder()`: Execute sales with partial fulfillment support
-  - `rejectWineOrder()`: Decline orders with relationship tracking
-  - `generateCustomer()`: Prestige-based customer acquisition
-  - `calculateWineValueIndex()`: Vineyard value + prestige pricing
-  - `calculateWineQualityIndex()`: Quality + balance pricing
-- **UI**: `src/components/pages/Sales.tsx` - Complete sales interface with customer information
+### Highscore System
+- **File**: `src/lib/services/user/highscoreService.ts`
+- **Function**: Global leaderboards with flexible score types
 
-**What's NOT Implemented**:
-- ❌ **Market Mechanics**: No demand/pricing variation over time
-- ❌ **Contract System**: No long-term contracts
-- ❌ **Market Saturation**: No diminishing returns based on inventory
+### Admin Tools
+- **File**: `src/components/pages/AdminDashboard.tsx`, `src/lib/services/admin/adminService.ts`
+- **Functions**: Clear accounts, reset database, set game date, manage money
 
-### 5. Finance System ✅ **IMPLEMENTED**
-**What's Implemented**:
-- **Finance Service**: `src/lib/services/user/financeService.ts` - Complete transaction management
-- **Financial UI**: `src/components/finance/` - Income statements, balance sheets, cash flow
-- **Transaction System**: All money flows tracked with audit trail
-- **Asset Valuation**: Sophisticated calculation of vineyard (land value), wine (stage×quality×price), and grape values
-- **Integration**: Sales and admin tools use transaction system
-- **Financial Components**:
-  - `IncomeBalanceView.tsx` - Income statements and balance sheets
-  - `CashFlowView.tsx` - Cash flow analysis
-  - `UpgradesPlaceholder.tsx` - Future upgrades system
-- **Transaction Categories**: Income, expenses, sales, purchases, prestige events
+## 🔧 Technical Architecture
 
-**What's NOT Implemented**:
-- ❌ **Buildings Value**: Always shows €0 (placeholder)
-- ❌ **Advanced Asset Valuation**: No market fluctuations, depreciation, or sophisticated pricing
- - Loan, economy phase
+### Service Layer
+- **Location**: `src/lib/services/` - Organized by domain (admin/, core/, finance/, user/)
+- **Pattern**: Business logic in services → Database → `triggerGameUpdate()` → Component re-render
 
-### 6. Player Interface ✅ **IMPLEMENTED**
-**What's Implemented**:
-- **Navigation**: `src/components/layout/Header.tsx` - Time display, advance button, player menu, prestige display
-- **Player Menu**: Dropdown with Profile, Settings, Admin Dashboard, Achievements, Winepedia, Logout
-- **Notification System**: `src/lib/services/core/notificationService.ts` - Centralized notification system with database persistence
-- **Admin Dashboard**: `src/components/pages/AdminDashboard.tsx` - Data management tools, prestige management
-- **Settings**: `src/components/pages/Settings.tsx` - Company-specific settings and notification preferences
-- **Winepedia**: `src/components/pages/Winepedia.tsx` - Grape variety information with interactive tabs
-- **Profile**: `src/components/pages/Profile.tsx` - Company management and portfolio stats
-- **Achievements**: `src/components/pages/Achievements.tsx` - Dynamic tier-based achievement system
-- **Highscores**: `src/components/pages/Highscores.tsx` - Global leaderboard system
-- **Company Overview**: `src/components/pages/CompanyOverview.tsx` - Company stats and navigation
-- **Login System**: `src/components/pages/Login.tsx` - Company creation, selection, and highscores
-- **Staff System**: `src/components/pages/Staff.tsx` - Staff management with teams, search, and recruitment
-- **Winepedia Tabs**: `DynamicRangeTab`, `CrossTraitPenaltyTab`, `YieldProjectionTab` - Interactive system visualization
+### Hooks
+- `useGameState()` - Reactive game state access
+- `useGameStateWithData()` - Game state with async data loading
+- `useGameUpdates()` - Subscribe to global updates
+- `useLoadingState()` - Loading state management
+- `useIsMobile()` - Mobile detection
 
-## 🎯 **Implementation Status Summary**
+### UI Components
+- **Pages**: Login, Profile, Settings, AdminDashboard, Finance, CompanyOverview, Highscores, Achievements (placeholder)
+- **Layout**: Header with navigation and player menu
+- **Framework**: React + TypeScript + ShadCN UI
 
-### ✅ **COMPLETED SYSTEMS**
-- **Time Progression**: Manual week advancement with game tick system (order generation, activity progression, vine aging)
-- **Vineyard Management**: Land buying, planting, harvesting with health system, overgrowth tracking, and clearing activities
-- **Wine Production**: Complete grapes → must → wine → bottled pipeline with wine features framework
-- **Sales System**: Sophisticated customer system, multi-factor pricing, regional characteristics, order rejection logic
-- **Finance System**: Transaction tracking, financial reporting, asset valuation with comprehensive UI
-- **Player Interface**: Complete navigation, notifications, admin tools, company management, achievement system
-- **Staff System**: Staff management with teams, search, recruitment, and wage calculation
-- **Wine Characteristics**: 6-characteristic system with balance calculation, cross-trait penalties, synergy rules
-- **Wine Features**: Config-driven wine features (oxidation, terroir, stuck fermentation, bottle aging, late harvest)
-- **Activity System**: Planting, harvesting, clearing, and other activities with work calculation and progress tracking
-- **Prestige System**: Company and vineyard prestige with event tracking and relationship management
-- **Company System**: Multi-company support with data isolation and company switching
+### Types
+- **Shared Interfaces**: `src/lib/types/UItypes.ts` - `PageProps`, `NavigationProps`, `CompanyProps`
+- **Database Types**: `src/lib/database/` - TypeScript interfaces
 
-### ❌ **NOT IMPLEMENTED**
-- **Seasonal Effects**: No automatic seasonal changes
-- **Storage Management**: Detailed vessel tracking
-- **Market Mechanics**: Dynamic pricing/demand
-- **Contract System**: Long-term sales contracts
-- **Advanced Farming Methods**: Organic/biodynamic farming
-- **Market Saturation**: Diminishing returns based on inventory
+## ✅ What Exists
+- User/Company system (1:1 relationship)
+- Basic game state (time, money)
+- Database integration with RLS
+- Transaction tracking
+- Notification system
+- Highscore system
+- Admin tools
+- UI framework and navigation
 
-## 🔧 **Technical Architecture**
+## ❌ What Was Removed
+- All game-specific systems (vineyards, wine, sales, staff, etc.)
+- Game mechanics and rules
+- Achievement system (placeholder only)
 
-### Database Schema ✅ **IMPLEMENTED**
-- **vineyards**: Vineyard data with company isolation, health tracking, overgrowth system
-- **wine_batches**: Wine inventory with stage tracking, characteristics, wine features
-- **game_state**: Time, money, and global state with company data
-- **wine_orders**: Sales order management with customer relationships
-- **transactions**: Financial transaction history with detailed categorization
-- **notifications**: Centralized notification system with database persistence
-- **activities**: Activity system with work tracking and progress
-- **staff**: Staff management with teams, skills, and wage calculation
-- **achievements**: Dynamic tier-based achievement system
-- **prestige_events**: Prestige system with event tracking and decay
-- **relationship_boosts**: Customer relationship management
-
-### Component Structure ✅ **IMPLEMENTED**
-- **Services**: `src/lib/services/` - Organized by domain (user/, sales/, wine/, core/, activity/, vineyard/)
-- **UI Components**: `src/components/` - React components with ShadCN, organized by function
-- **Hooks**: `src/hooks/` - State management, data loading, and game-specific hooks
-- **Utils**: `src/lib/utils/` - Helper functions, calculations, and formatting
-- **Types**: `src/lib/types/` - Centralized type definitions with comprehensive interfaces
-- **Constants**: `src/lib/constants/` - Game constants, grape data, vineyard data, wine features
-- **Database**: `src/lib/database/` - Supabase integration with service layer architecture
+## 📝 Next Steps
+To build a trading game, add:
+- Trading mechanics (buy/sell systems)
+- Market data and pricing
+- Inventory management
+- Trading-specific UI pages
+- Game rules and win conditions

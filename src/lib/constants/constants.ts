@@ -9,9 +9,12 @@ export const GAME_INITIALIZATION = {
   STARTING_DAY: 1,
   STARTING_MONTH: 1,
   STARTING_YEAR: 2024,
-  
-  // Starting prestige
-  STARTING_PRESTIGE: 1,
+
 } as const;
 
-// Note: Prestige and customer-related constants have been removed as those systems were deleted
+// Time system constants for tradergame
+// Day-Month-Year system: 24 days per month, 7 months per year
+
+export const DAYS_PER_MONTH = 24;
+export const MONTHS_PER_YEAR = 7;
+export const DAYS_PER_YEAR = DAYS_PER_MONTH * MONTHS_PER_YEAR;

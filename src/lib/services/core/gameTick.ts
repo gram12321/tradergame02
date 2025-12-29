@@ -3,7 +3,7 @@ import { notificationService, highscoreService, calculateCompanyValue } from '@/
 import { triggerGameUpdate } from '@/hooks/useGameUpdates';
 import { NotificationCategory } from '@/lib/utils';
 import { GAME_INITIALIZATION } from '@/lib/constants';
-import { DAYS_PER_MONTH, MONTHS_PER_YEAR } from '@/lib/constants/timeConstants';
+import { DAYS_PER_MONTH, MONTHS_PER_YEAR } from '@/lib/constants/constants';
 
 // Prevent concurrent game tick execution
 let isProcessingGameTick = false;
@@ -106,7 +106,6 @@ async function submitDailyHighscores(): Promise<void> {
 
     // Use the highscoreService method that handles business logic
     await highscoreService.submitCompanyHighscores(
-      currentCompany.id,
       currentCompany.name,
       gameState.day || 1,
       gameState.month || 1,

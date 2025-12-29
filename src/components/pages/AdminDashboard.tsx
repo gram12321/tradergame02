@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useLoadingState } from '@/hooks';
 import { SimpleCard, Button, Label, Input, Tabs, TabsContent, TabsList, TabsTrigger, Card, CardContent, CardDescription, CardHeader, CardTitle, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui';
-import { Settings, Users, AlertTriangle, Trash2 } from 'lucide-react';
+import { Settings, AlertTriangle, Trash2 } from 'lucide-react';
 import { PageProps, NavigationProps } from '../../lib/types/UItypes';
 import {
-  adminSetGoldToCompany, adminClearAllHighscores, adminClearCompanyValueHighscores, adminClearAllCompanies, adminClearAllUsers, adminClearAllCompaniesAndUsers, adminFullDatabaseReset, adminSetGameDate
+  adminSetGoldToCompany, adminClearAllHighscores, adminClearCompanyValueHighscores, adminClearAllCompanies, adminFullDatabaseReset, adminSetGameDate
 } from '@/lib/services';
 import { GAME_INITIALIZATION } from '@/lib/constants';
-import { DAYS_PER_MONTH, MONTHS_PER_YEAR } from '@/lib/constants/timeConstants';
+import { DAYS_PER_MONTH, MONTHS_PER_YEAR } from '@/lib/constants/constants';
 
 interface AdminDashboardProps extends PageProps, NavigationProps {
 }
@@ -66,48 +66,46 @@ export function AdminDashboard({ onBack, onNavigateToLogin }: AdminDashboardProp
   });
 
   // Database cleanup functions
-  const handleClearAllCompanies = () => withLoading(async () => {
+  const handleClearAllAccounts = () => withLoading(async () => {
     await adminClearAllCompanies();
+    
+    // Clear localStorage for previously used companies (they no longer exist)
+    try {
+      localStorage.removeItem('previouslyUsedCompanies');
+      localStorage.removeItem('lastCompanyName');
+    } catch (error) {
+      console.error('Error clearing localStorage:', error);
+    }
+    
     // Navigate to login and refresh browser
     if (onNavigateToLogin) {
       onNavigateToLogin();
     }
+    // Force a full page reload to ensure clean state
     setTimeout(() => {
       window.location.reload();
-    }, 1000);
-  });
-
-  const handleClearAllUsers = () => withLoading(async () => {
-    await adminClearAllUsers();
-    // Navigate to login and refresh browser
-    if (onNavigateToLogin) {
-      onNavigateToLogin();
-    }
-    setTimeout(() => {
-      window.location.reload();
-    }, 1000);
-  });
-
-  const handleClearAllCompaniesAndUsers = () => withLoading(async () => {
-    await adminClearAllCompaniesAndUsers();
-    // Navigate to login and refresh browser
-    if (onNavigateToLogin) {
-      onNavigateToLogin();
-    }
-    setTimeout(() => {
-      window.location.reload();
-    }, 1000);
+    }, 500);
   });
 
   const handleFullDatabaseReset = () => withLoading(async () => {
     await adminFullDatabaseReset();
+    
+    // Clear localStorage for previously used companies (they no longer exist)
+    try {
+      localStorage.removeItem('previouslyUsedCompanies');
+      localStorage.removeItem('lastCompanyName');
+    } catch (error) {
+      console.error('Error clearing localStorage:', error);
+    }
+    
     // Navigate to login and refresh browser
     if (onNavigateToLogin) {
       onNavigateToLogin();
     }
+    // Force a full page reload to ensure clean state
     setTimeout(() => {
       window.location.reload();
-    }, 2000);
+    }, 500);
   });
 
   return (
@@ -145,38 +143,21 @@ export function AdminDashboard({ onBack, onNavigateToLogin }: AdminDashboardProp
             {/* Game Data Cleanup */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <SimpleCard
-                title="Game Data"
-                description="Clear game-related data and progression"
+                title="Account Management"
+                description="Clear all companies"
               >
                 <Button
                   variant="destructive"
-                  onClick={handleClearAllCompanies}
+                  onClick={handleClearAllAccounts}
                   disabled={isLoading}
                   className="w-full"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
-                  Clear All Companies
+                  Clear All Accounts
                 </Button>
-
-                <Button
-                  variant="destructive"
-                  onClick={handleClearAllUsers}
-                  disabled={isLoading}
-                  className="w-full"
-                >
-                  <Users className="h-4 w-4 mr-2" />
-                  Clear All Users
-                </Button>
-
-                <Button
-                  variant="destructive"
-                  onClick={handleClearAllCompaniesAndUsers}
-                  disabled={isLoading}
-                  className="w-full"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Clear All Companies & Users
-                </Button>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Removes all companies from the database.
+                </p>
               </SimpleCard>
 
               <SimpleCard

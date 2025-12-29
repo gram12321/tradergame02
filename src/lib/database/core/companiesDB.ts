@@ -5,37 +5,34 @@ const COMPANIES_TABLE = 'companies';
 /**
  * Companies Database Operations
  * Basic CRUD operations for company data persistence
- * Simplified: Each user has exactly one company (1:1 relationship)
+ * Company name serves as the unique identifier
  */
 
-export interface CompanyData {
-  id?: string;
-  name: string;
-  user_id: string; // Required - 1:1 relationship with user
-  current_day?: number;
-  current_month?: number;
-  current_year?: number;
-  money?: number;
-  starting_country?: string;
-}
-
-// Company type (same as CompanyData, using camelCase property names)
 export type Company = {
-  id: string;
   name: string;
-  userId: string;
   currentDay: number;
   currentMonth: number;
   currentYear: number;
   money: number;
-  startingCountry?: string;
+  avatar?: string;
+  avatarColor?: string;
 };
 
 /**
  * Insert a new company
  */
-export const insertCompany = async (companyData: CompanyData): Promise<{ success: boolean; data?: any; error?: string }> => {
+export const insertCompany = async (company: Partial<Company>): Promise<{ success: boolean; data?: any; error?: string }> => {
   try {
+    const companyData: any = {
+      name: company.name,
+      current_day: company.currentDay ?? 1,
+      current_month: company.currentMonth ?? 1,
+      current_year: company.currentYear ?? 2024,
+      money: company.money ?? 0,
+      avatar: company.avatar ?? 'default',
+      avatar_color: company.avatarColor ?? 'blue'
+    };
+    
     const { data, error } = await supabase
       .from(COMPANIES_TABLE)
       .insert(companyData)
@@ -46,7 +43,18 @@ export const insertCompany = async (companyData: CompanyData): Promise<{ success
       return { success: false, error: error.message };
     }
 
-    return { success: true, data };
+    // Map database response to Company type (no id field)
+    const mappedData = {
+      name: data.name,
+      currentDay: data.current_day || 1,
+      currentMonth: data.current_month || 1,
+      currentYear: data.current_year || 2024,
+      money: data.money || 0,
+      avatar: data.avatar || 'default',
+      avatarColor: data.avatar_color || 'blue'
+    };
+
+    return { success: true, data: mappedData };
   } catch (error: any) {
     console.error('Error inserting company:', error);
     return { success: false, error: error.message || 'An unexpected error occurred' };
@@ -54,59 +62,29 @@ export const insertCompany = async (companyData: CompanyData): Promise<{ success
 };
 
 /**
- * Get company by ID
+ * Get company by name (replaces getCompanyById - name is now the unique identifier)
  */
-export const getCompanyById = async (companyId: string): Promise<Company | null> => {
+export const getCompanyByName = async (name: string): Promise<Company | null> => {
   try {
     const { data, error } = await supabase
       .from(COMPANIES_TABLE)
       .select('*')
-      .eq('id', companyId)
-      .single();
-
-    if (error || !data) return null;
-
-    return {
-      id: data.id!,
-      name: data.name,
-      userId: data.user_id,
-      currentDay: data.current_day || 1,
-      currentMonth: data.current_month || 1,
-      currentYear: data.current_year || 2024,
-      money: data.money || 0,
-      startingCountry: data.starting_country
-    };
-  } catch (error) {
-    console.error('Error getting company by ID:', error);
-    return null;
-  }
-};
-
-/**
- * Get user's company (1:1 relationship - each user has exactly one company)
- */
-export const getUserCompany = async (userId: string): Promise<Company | null> => {
-  try {
-    const { data, error } = await supabase
-      .from(COMPANIES_TABLE)
-      .select('*')
-      .eq('user_id', userId)
+      .eq('name', name)
       .maybeSingle();
 
     if (error || !data) return null;
 
     return {
-      id: data.id!,
       name: data.name,
-      userId: data.user_id,
       currentDay: data.current_day || 1,
       currentMonth: data.current_month || 1,
       currentYear: data.current_year || 2024,
       money: data.money || 0,
-      startingCountry: data.starting_country
+      avatar: data.avatar || 'default',
+      avatarColor: data.avatar_color || 'blue'
     };
   } catch (error) {
-    console.error('Error getting user company:', error);
+    console.error('Error getting company by name:', error);
     return null;
   }
 };
@@ -129,17 +107,29 @@ export const checkCompanyNameExists = async (name: string): Promise<boolean> => 
   }
 };
 
+
 /**
  * Update company
  */
-export const updateCompany = async (companyId: string, updates: Partial<CompanyData>): Promise<{ success: boolean; error?: string }> => {
+export const updateCompany = async (companyName: string, updates: Partial<Company>): Promise<{ success: boolean; error?: string }> => {
   try {
-    const updateData: any = { ...updates };
+    const updateData: any = {};
+    if (updates.currentDay !== undefined) updateData.current_day = updates.currentDay;
+    if (updates.currentMonth !== undefined) updateData.current_month = updates.currentMonth;
+    if (updates.currentYear !== undefined) updateData.current_year = updates.currentYear;
+    if (updates.money !== undefined) updateData.money = updates.money;
+    if (updates.name !== undefined && updates.name !== companyName) {
+      // If name is being changed, we need special handling - but name is the PK so this is complex
+      // For now, we'll prevent name changes (or require a separate rename function)
+      return { success: false, error: 'Cannot change company name - name is the primary identifier' };
+    }
+    if (updates.avatar !== undefined) updateData.avatar = updates.avatar;
+    if (updates.avatarColor !== undefined) updateData.avatar_color = updates.avatarColor;
 
     const { error } = await supabase
       .from(COMPANIES_TABLE)
       .update(updateData)
-      .eq('id', companyId);
+      .eq('name', companyName);
 
     if (error) {
       return { success: false, error: error.message };
@@ -155,12 +145,12 @@ export const updateCompany = async (companyId: string, updates: Partial<CompanyD
 /**
  * Delete company
  */
-export const deleteCompany = async (companyId: string): Promise<{ success: boolean; error?: string }> => {
+export const deleteCompany = async (companyName: string): Promise<{ success: boolean; error?: string }> => {
   try {
     const { error } = await supabase
       .from(COMPANIES_TABLE)
       .delete()
-      .eq('id', companyId);
+      .eq('name', companyName);
 
     if (error) {
       return { success: false, error: error.message };

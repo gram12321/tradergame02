@@ -40,7 +40,7 @@ export function Settings({ currentCompany, onBack, onSignOut }: SettingsProps) {
 
   const loadLocalSettings = () => {
     try {
-      const key = `settings_${currentCompany?.id}`;
+      const key = `settings_${currentCompany?.name}`;
       const stored = localStorage.getItem(key);
       
       if (stored) {

@@ -6,7 +6,7 @@ import { formatGameDate, formatNumber } from '@/lib/utils/utils';
 import { useGameState } from '@/hooks';
 import { getCurrentCompany, highscoreService } from '@/lib/services';
 import { NavigationProps } from '../../lib/types/UItypes';
-import { DAYS_PER_MONTH, MONTHS_PER_YEAR } from '@/lib/constants/timeConstants';
+import { DAYS_PER_MONTH, MONTHS_PER_YEAR } from '@/lib/constants/constants';
 
 interface CompanyOverviewProps extends NavigationProps {
   // Inherits onNavigate from NavigationProps
@@ -30,7 +30,7 @@ const CompanyOverview: React.FC<CompanyOverviewProps> = ({ onNavigate }) => {
     if (company) {
       loadCompanyRanking();
     }
-  }, [company?.id]);
+  }, [company?.name]);
 
   const loadCompanyRanking = () => withLoading(async () => {
     if (!company) return;
@@ -38,7 +38,7 @@ const CompanyOverview: React.FC<CompanyOverviewProps> = ({ onNavigate }) => {
     try {
       // Get all company_value highscores to find ranking
       const highscores = await highscoreService.getHighscores('company_value', 1000);
-      const companyScore = highscores.findIndex(score => score.companyId === company.id);
+      const companyScore = highscores.findIndex(score => score.companyName === company.name);
       
       if (companyScore !== -1) {
         setRanking({

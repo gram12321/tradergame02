@@ -110,7 +110,7 @@ function App() {
       case 'highscores':
         return (
           <Highscores 
-            currentCompanyId={currentCompany?.id}
+            currentCompanyName={currentCompany?.name}
             onBack={() => setCurrentPage(currentCompany ? 'company-overview' : 'login')}
           />
         );

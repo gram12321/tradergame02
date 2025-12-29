@@ -10,7 +10,6 @@ const HIGHSCORES_TABLE = 'highscores';
 export type ScoreType = string;
 
 export interface HighscoreData {
-  company_id: string;
   company_name: string;
   score_type: ScoreType;
   score_value: number;
@@ -23,7 +22,6 @@ export interface HighscoreData {
 
 export interface HighscoreEntry {
   id: string;
-  companyId: string;
   companyName: string;
   scoreType: ScoreType;
   scoreValue: number;
@@ -41,7 +39,6 @@ export interface HighscoreEntry {
 function mapHighscoreFromDB(dbScore: any): HighscoreEntry {
   return {
     id: dbScore.id,
-    companyId: dbScore.company_id,
     companyName: dbScore.company_name,
     scoreType: dbScore.score_type,
     scoreValue: dbScore.score_value,
@@ -96,12 +93,12 @@ export const loadHighscores = async (scoreType: ScoreType, limit: number = 20, a
 /**
  * Get company score
  */
-export const getCompanyScore = async (companyId: string, scoreType: ScoreType): Promise<any | null> => {
+export const getCompanyScore = async (companyName: string, scoreType: ScoreType): Promise<any | null> => {
   try {
     const { data, error } = await supabase
       .from(HIGHSCORES_TABLE)
       .select('score_value')
-      .eq('company_id', companyId)
+      .eq('company_name', companyName)
       .eq('score_type', scoreType)
       .single();
 

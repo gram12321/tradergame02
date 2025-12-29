@@ -1,15 +1,14 @@
 import { 
-  getUserSettings as loadUserSettingsFromDB, 
-  upsertUserSettings as saveUserSettingsToDB, 
-  deleteUserSettings as deleteUserSettingsFromDB,
-  type UserSettingsData
+  getCompanySettings as loadCompanySettingsFromDB, 
+  upsertCompanySettings as saveCompanySettingsToDB, 
+  deleteCompanySettings as deleteCompanySettingsFromDB,
+  type CompanySettingsData
 } from '@/lib/database';
 
-// UserSettings interface (camelCase version for app usage)
-export interface UserSettings {
+// CompanySettings interface (camelCase version for app usage)
+export interface CompanySettings {
   id?: string;
-  userId: string;
-  companyId: string;
+  companyName: string;
   showToastNotifications?: boolean;
   allowResourceSubstitution?: boolean;
   showDetailedInputSection?: boolean;
@@ -21,11 +20,10 @@ export interface UserSettings {
 }
 
 // Map database format to app format
-const mapSettingsFromDB = (data: UserSettingsData): UserSettings => {
+const mapSettingsFromDB = (data: CompanySettingsData): CompanySettings => {
   return {
-    id: data.user_id, // Assuming user_id,company_id composite key - may need adjustment
-    userId: data.user_id,
-    companyId: data.company_id,
+    id: data.company_name, // Using company_name as id since it's unique
+    companyName: data.company_name,
     showToastNotifications: data.show_toast_notifications,
     allowResourceSubstitution: data.allow_resource_substitution,
     showDetailedInputSection: data.show_detailed_input_section,
@@ -68,7 +66,7 @@ const DEFAULT_VIEW_PREFERENCES: ViewPreferences = {
   hierarchyView: false
 };
 
-const DEFAULT_USER_SETTINGS: Omit<UserSettings, 'id' | 'userId' | 'companyId' | 'createdAt' | 'updatedAt'> = {
+const DEFAULT_COMPANY_SETTINGS: Omit<CompanySettings, 'id' | 'companyName' | 'createdAt' | 'updatedAt'> = {
   showToastNotifications: true,
   allowResourceSubstitution: true,
   showDetailedInputSection: true,
@@ -80,36 +78,33 @@ const DEFAULT_USER_SETTINGS: Omit<UserSettings, 'id' | 'userId' | 'companyId' | 
   }
 };
 
-class UserSettingsService {
-  public async getUserSettings(userId: string, companyId: string): Promise<UserSettings> {
+class CompanySettingsService {
+  public async getCompanySettings(companyName: string): Promise<CompanySettings> {
     try {
-      const settings = await loadUserSettingsFromDB(userId, companyId);
+      const settings = await loadCompanySettingsFromDB(companyName);
 
       if (!settings) {
         // Return default settings if none exist
         return {
-          userId,
-          companyId,
-          ...DEFAULT_USER_SETTINGS
+          companyName,
+          ...DEFAULT_COMPANY_SETTINGS
         };
       }
 
       return mapSettingsFromDB(settings);
     } catch (error) {
-      console.error('Error getting user settings:', error);
+      console.error('Error getting company settings:', error);
       return {
-        userId,
-        companyId,
-        ...DEFAULT_USER_SETTINGS
+        companyName,
+        ...DEFAULT_COMPANY_SETTINGS
       };
     }
   }
 
-  public async saveUserSettings(settings: Partial<UserSettings> & { userId: string; companyId: string }): Promise<{ success: boolean; error?: string }> {
+  public async saveCompanySettings(settings: Partial<CompanySettings> & { companyName: string }): Promise<{ success: boolean; error?: string }> {
     try {
-      const settingsData: UserSettingsData = {
-        user_id: settings.userId,
-        company_id: settings.companyId,
+      const settingsData: CompanySettingsData = {
+        company_name: settings.companyName,
         show_toast_notifications: settings.showToastNotifications,
         allow_resource_substitution: settings.allowResourceSubstitution,
         show_detailed_input_section: settings.showDetailedInputSection,
@@ -121,23 +116,22 @@ class UserSettingsService {
         }
       };
 
-      return await saveUserSettingsToDB(settingsData);
+      return await saveCompanySettingsToDB(settingsData);
     } catch (error) {
-      console.error('Error saving user settings:', error);
+      console.error('Error saving company settings:', error);
       return { success: false, error: 'An unexpected error occurred' };
     }
   }
 
   public async updateNotificationSetting(
-    userId: string,
-    companyId: string,
+    companyName: string,
     type: 'categories' | 'specificMessages',
     key: string,
     value: boolean
   ): Promise<{ success: boolean; error?: string }> {
     try {
       // Get current settings
-      const currentSettings = await this.getUserSettings(userId, companyId);
+      const currentSettings = await this.getCompanySettings(companyName);
       
       // Update the specific setting
       if (type === 'categories') {
@@ -153,7 +147,7 @@ class UserSettingsService {
       }
 
       // Save updated settings
-      return await this.saveUserSettings(currentSettings);
+      return await this.saveCompanySettings(currentSettings);
     } catch (error) {
       console.error('Error updating notification setting:', error);
       return { success: false, error: 'An unexpected error occurred' };
@@ -161,14 +155,13 @@ class UserSettingsService {
   }
 
   public async updateViewPreferences(
-    userId: string,
-    companyId: string,
+    companyName: string,
     viewName: 'market' | 'inventory',
     preferences: Partial<ViewPreferences>
   ): Promise<{ success: boolean; error?: string }> {
     try {
       // Get current settings
-      const currentSettings = await this.getUserSettings(userId, companyId);
+      const currentSettings = await this.getCompanySettings(companyName);
       
       // Initialize view preferences if missing
       if (!currentSettings.viewPreferences) {
@@ -189,29 +182,28 @@ class UserSettingsService {
       };
 
       // Save updated settings
-      return await this.saveUserSettings(currentSettings);
+      return await this.saveCompanySettings(currentSettings);
     } catch (error) {
       console.error('Error updating view preferences:', error);
       return { success: false, error: 'An unexpected error occurred' };
     }
   }
 
-  public async deleteUserSettings(userId: string, companyId?: string): Promise<{ success: boolean; error?: string }> {
-    return await deleteUserSettingsFromDB(userId, companyId);
+  public async deleteCompanySettings(companyName: string): Promise<{ success: boolean; error?: string }> {
+    return await deleteCompanySettingsFromDB(companyName);
   }
 
-  // Helper methods for localStorage fallback (for anonymous users)
-  public getLocalSettings(companyId: string): UserSettings {
+  // Helper methods for localStorage fallback (for anonymous/offline usage)
+  public getLocalSettings(companyName: string): CompanySettings {
     try {
-      const key = `company_settings_${companyId}`;
+      const key = `company_settings_${companyName}`;
       const stored = localStorage.getItem(key);
       
       if (stored) {
         const parsed = JSON.parse(stored);
         return {
-          userId: 'anonymous',
-          companyId,
-          ...DEFAULT_USER_SETTINGS,
+          companyName,
+          ...DEFAULT_COMPANY_SETTINGS,
           ...parsed
         };
       }
@@ -220,30 +212,29 @@ class UserSettingsService {
     }
 
     return {
-      userId: 'anonymous',
-      companyId,
-      ...DEFAULT_USER_SETTINGS
+      companyName,
+      ...DEFAULT_COMPANY_SETTINGS
     };
   }
 
-  public saveLocalSettings(companyId: string, settings: Partial<UserSettings>): void {
+  public saveLocalSettings(companyName: string, settings: Partial<CompanySettings>): void {
     try {
-      const key = `company_settings_${companyId}`;
-      const current = this.getLocalSettings(companyId);
+      const key = `company_settings_${companyName}`;
+      const current = this.getLocalSettings(companyName);
       const updated = { ...current, ...settings };
       
-      // Remove userId and companyId before storing
-      const { userId, companyId: cId, ...settingsToStore } = updated;
+      // Remove companyName before storing
+      const { companyName: cName, ...settingsToStore } = updated;
       localStorage.setItem(key, JSON.stringify(settingsToStore));
     } catch (error) {
       console.error('Error saving local settings:', error);
     }
   }
 
-  public clearLocalSettings(companyId?: string): void {
+  public clearLocalSettings(companyName?: string): void {
     try {
-      if (companyId) {
-        localStorage.removeItem(`company_settings_${companyId}`);
+      if (companyName) {
+        localStorage.removeItem(`company_settings_${companyName}`);
       } else {
         // Clear all company settings
         Object.keys(localStorage)
@@ -257,5 +248,6 @@ class UserSettingsService {
 
 }
 
-export const userSettingsService = new UserSettingsService();
-export default userSettingsService;
+export const companySettingsService = new CompanySettingsService();
+export default companySettingsService;
+

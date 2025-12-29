@@ -7,7 +7,7 @@ import { getTailwindClasses } from "@/lib/utils/colorMapping";
 import { cn } from "@/lib/utils/utils";
 import { notificationService, type PlayerNotification } from "@/lib/services/core/notificationService";
 import { getGameState } from "@/lib/services/core/gameState";
-import { DAYS_PER_MONTH, MONTHS_PER_YEAR } from "@/lib/constants/timeConstants";
+import { DAYS_PER_MONTH, MONTHS_PER_YEAR } from "@/lib/constants/constants";
 
 interface NotificationCenterProps {
   onClose?: () => void;

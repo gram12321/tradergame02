@@ -1,23 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-  Button,
-  Separator,
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-  Label
-} from "@/components/ui";
+import { Tabs, TabsContent, TabsList, TabsTrigger, Button, Separator, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Label } from "@/components/ui";
 import { IncomeBalanceView } from './IncomeBalanceView';
 import { CashFlowView } from './CashFlowView';
 
 import { FINANCE_TAB_STYLES, FINANCE_BUTTON_STYLES } from '@/lib/constants/financeConstants';
-import { MONTHS_PER_YEAR } from '@/lib/constants/timeConstants';
+import { MONTHS_PER_YEAR } from '@/lib/constants/constants';
 import { useGameState, useGameStateWithData } from '@/hooks';
 import { loadTransactions } from '@/lib/services';
 

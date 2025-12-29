@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { processGameTick, clearLastCompanyIdForLogout, getCurrentCompany } from '@/lib/services';
+import { processGameTick, clearLastCompanyNameForLogout, getCurrentCompany } from '@/lib/services';
 import { formatGameDate, formatNumber } from '@/lib/utils';
 import { NAVIGATION_EMOJIS } from '@/lib/utils';
 import { Button, Badge, Avatar, AvatarFallback, AvatarImage, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui';
@@ -172,7 +172,7 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, onTimeAdvance,
               <MenuIcon className="h-6 w-6" />
             </Button>
             
-            {/* Desktop user menu */}
+            {/* Desktop menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center space-x-2 p-1 rounded-full h-8 w-8 text-white hover:bg-red-700 hidden lg:flex">
@@ -237,7 +237,7 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, onTimeAdvance,
 
                       // Remove company-scoped settings if present
                       if (company?.id) {
-                        localStorage.removeItem(`company_settings_${company.id}`);
+                        localStorage.removeItem(`company_settings_${company.name}`);
                       }
 
                       // Remove any legacy company settings keys
@@ -245,8 +245,8 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, onTimeAdvance,
                         .filter((key) => key.startsWith('company_settings_'))
                         .forEach((key) => localStorage.removeItem(key));
                       
-                      // Clear lastCompanyId to prevent autologin
-                      clearLastCompanyIdForLogout();
+                      // Clear lastCompanyName to prevent autologin
+                      clearLastCompanyNameForLogout();
                     } catch {}
                     window.location.reload();
                   }}

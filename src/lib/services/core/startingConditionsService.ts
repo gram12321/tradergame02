@@ -1,5 +1,6 @@
 import { addTransaction } from '../finance/financeService';
 import { TRANSACTION_CATEGORIES } from '@/lib/constants';
+import { GAME_INITIALIZATION } from '@/lib/constants/constants';
 
 /**
  * Minimal Starting Conditions Service
@@ -12,34 +13,22 @@ export interface ApplyStartingConditionsResult {
   startingMoney?: number;
 }
 
-const STARTING_MONEY = 10000;
-
 /**
  * Apply starting conditions to a new company
- * Sets initial company balance to 10000
+ * Sets initial company balance using GAME_INITIALIZATION.STARTING_MONEY
  */
 export async function applyStartingConditions(
-  companyId: string
+  companyName: string
 ): Promise<ApplyStartingConditionsResult> {
   try {
-    // Add starting capital transaction
-    try {
-      await addTransaction(
-        STARTING_MONEY,
-        'Initial Capital: Starting balance',
-        TRANSACTION_CATEGORIES.INITIAL_INVESTMENT,
-        false,
-        companyId
-      );
-    } catch (transactionError) {
-      console.error('Error adding starting capital:', transactionError);
-      return { success: false, error: 'Failed to record starting capital' };
-    }
-
-    return {
-      success: true,
-      startingMoney: STARTING_MONEY
-    };
+    await addTransaction(
+      GAME_INITIALIZATION.STARTING_MONEY,
+      'Initial Capital: Starting balance',
+      TRANSACTION_CATEGORIES.INITIAL_INVESTMENT,
+      false,
+      companyName
+    );
+    return { success: true, startingMoney: GAME_INITIALIZATION.STARTING_MONEY };
   } catch (error) {
     console.error('Error applying starting conditions:', error);
     return { success: false, error: 'Failed to apply starting conditions' };

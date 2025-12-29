@@ -8,7 +8,6 @@ import { upsertHighscore, loadHighscores, deleteHighscores, type ScoreType, type
  */
 
 export interface HighscoreSubmission {
-  companyId: string;
   companyName: string;
   scoreType: ScoreType;
   scoreValue: number;
@@ -25,7 +24,6 @@ class HighscoreService {
   public async submitHighscore(submission: HighscoreSubmission): Promise<{ success: boolean; error?: string }> {
     try {
       const highscoreData: HighscoreData = {
-        company_id: submission.companyId,
         company_name: submission.companyName,
         score_type: submission.scoreType,
         score_value: submission.scoreValue,
@@ -90,7 +88,6 @@ class HighscoreService {
    * Submit company value highscore
    */
   public async submitCompanyHighscores(
-    companyId: string,
     companyName: string,
     gameDay: number,
     gameMonth: number,
@@ -99,7 +96,6 @@ class HighscoreService {
   ): Promise<{ success: boolean; error?: string }> {
     try {
       const result = await this.submitHighscore({
-        companyId,
         companyName,
         scoreType: 'company_value',
         scoreValue: currentCompanyValue,

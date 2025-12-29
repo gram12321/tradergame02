@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { Transaction } from '../../types/types';
-import { getCurrentCompanyId } from '../../services/core/gameState';
+import { getCurrentCompanyName } from '../../services/core/gameState';
 import { buildGameDate } from '../dbMapperUtils';
 import { GAME_INITIALIZATION } from '@/lib/constants';
 
@@ -13,7 +13,7 @@ const TRANSACTIONS_TABLE = 'transactions';
 
 export interface TransactionData {
   id?: string;
-  company_id: string;
+  company_name: string;
   amount: number;
   description: string;
   category: string;
@@ -73,7 +73,7 @@ export const loadTransactions = async (): Promise<Transaction[]> => {
     const { data, error } = await supabase
       .from(TRANSACTIONS_TABLE)
       .select('*')
-      .eq('company_id', getCurrentCompanyId());
+      .eq('company_name', getCurrentCompanyName());
 
     if (error) throw error;
 

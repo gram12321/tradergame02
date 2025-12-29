@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { getCurrentCompanyId } from '../../services/core/gameState';
+import { getCurrentCompanyName } from '../../services/core/gameState';
 import { NotificationCategory } from '../../types/types';
 
 const NOTIFICATIONS_TABLE = 'notifications';
@@ -38,7 +38,7 @@ export const saveNotification = async (notification: DbNotificationRecord): Prom
       .from(NOTIFICATIONS_TABLE)
       .upsert({
         id: notification.id,
-        company_id: getCurrentCompanyId(),
+        company_name: getCurrentCompanyName(),
         game_day: notification.game_day,
         game_month: notification.game_month,
         game_year: notification.game_year,
@@ -62,7 +62,7 @@ export const loadNotifications = async (): Promise<DbNotificationRecord[]> => {
     const { data, error } = await supabase
       .from(NOTIFICATIONS_TABLE)
       .select('*')
-      .eq('company_id', getCurrentCompanyId())
+      .eq('company_name', getCurrentCompanyName())
       .order('game_year', { ascending: false })
       .order('game_month', { ascending: false })
       .order('game_day', { ascending: false });
@@ -92,7 +92,7 @@ export const clearNotifications = async (): Promise<void> => {
     const { error } = await supabase
       .from(NOTIFICATIONS_TABLE)
       .delete()
-      .eq('company_id', getCurrentCompanyId());
+      .eq('company_name', getCurrentCompanyName());
 
     if (error) throw error;
   } catch (error) {
@@ -113,7 +113,7 @@ export const saveNotificationFilter = async (filter: NotificationFilter): Promis
       .from(NOTIFICATION_FILTERS_TABLE)
       .upsert({
         id: filter.id,
-        company_id: getCurrentCompanyId(),
+        company_name: getCurrentCompanyName(),
         filter_type: filter.type,
         filter_value: filter.value,
         description: filter.description,
@@ -135,7 +135,7 @@ export const loadNotificationFilters = async (): Promise<NotificationFilter[]> =
     const { data, error } = await supabase
       .from(NOTIFICATION_FILTERS_TABLE)
       .select('*')
-      .eq('company_id', getCurrentCompanyId())
+      .eq('company_name', getCurrentCompanyName())
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -162,7 +162,7 @@ export const deleteNotificationFilter = async (filterId: string): Promise<void> 
       .from(NOTIFICATION_FILTERS_TABLE)
       .delete()
       .eq('id', filterId)
-      .eq('company_id', getCurrentCompanyId());
+      .eq('company_name', getCurrentCompanyName());
 
     if (error) throw error;
   } catch (error) {
@@ -178,7 +178,7 @@ export const clearNotificationFilters = async (): Promise<void> => {
     const { error } = await supabase
       .from(NOTIFICATION_FILTERS_TABLE)
       .delete()
-      .eq('company_id', getCurrentCompanyId());
+      .eq('company_name', getCurrentCompanyName());
 
     if (error) throw error;
   } catch (error) {

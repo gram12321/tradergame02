@@ -12,7 +12,7 @@ We have implemented comprehensive systems across multiple files and may need cle
 - **Excessive Comments**: Overly descriptive comments that state the obvious, Remove obvious comments that restate what the code does, keep only business logic explanations and non-obvious technical details. Or comments written to/from Humans
 
 ### **Specific Areas to Review**
-- **Services**: `src/lib/services/` - Check for duplicate functionality across user/, sales/, wine/, core/
+- **Services**: `src/lib/services/` - Check for duplicate functionality across admin/, core/, finance/, user/
 - **Components**: `src/components/` - Look for duplicate UI patterns and unused components
 - **Hooks**: `src/hooks/` - Consolidate similar state management patterns
 - **Utils**: `src/lib/utils/` - Remove duplicate helper functions

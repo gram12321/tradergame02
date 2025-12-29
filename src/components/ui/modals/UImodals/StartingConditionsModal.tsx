@@ -1,5 +1,5 @@
 // Starting Conditions Modal
-// Simplified: Only sets initial company balance to 10000
+// Simplified: Sets initial company balance using starting conditions service
 
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../shadCN/dialog';
@@ -9,7 +9,6 @@ import { applyStartingConditions } from '@/lib/services/core/startingConditionsS
 interface StartingConditionsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  companyId: string;
   companyName: string;
   onComplete: (startingMoney?: number) => void;
 }
@@ -17,7 +16,6 @@ interface StartingConditionsModalProps {
 export const StartingConditionsModal: React.FC<StartingConditionsModalProps> = ({
   isOpen,
   onClose,
-  companyId,
   companyName,
   onComplete
 }) => {
@@ -36,11 +34,10 @@ export const StartingConditionsModal: React.FC<StartingConditionsModalProps> = (
   const handleConfirm = async () => {
     setIsApplying(true);
     try {
-      const result = await applyStartingConditions(companyId);
+      const result = await applyStartingConditions(companyName);
       
       if (result.success) {
-        const appliedStartingMoney = result.startingMoney ?? 10000;
-        onComplete(appliedStartingMoney);
+        onComplete(result.startingMoney);
       } else {
         alert(result.error || 'Failed to apply starting conditions. Please try again.');
       }

@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { DAYS_PER_MONTH, MONTHS_PER_YEAR } from '@/lib/constants/timeConstants';
+import { DAYS_PER_MONTH, MONTHS_PER_YEAR } from '@/lib/constants/constants';
 import { GAME_INITIALIZATION } from '@/lib/constants';
 
 export function cn(...inputs: ClassValue[]): string {

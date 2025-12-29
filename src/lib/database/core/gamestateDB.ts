@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { getCurrentCompanyId } from '../../services/core/gameState';
+import { getCurrentCompanyName } from '../../services/core/gameState';
 
 const GAME_STATE_TABLE = 'game_state';
 
@@ -10,7 +10,7 @@ const GAME_STATE_TABLE = 'game_state';
  */
 
 export interface GameStateData {
-  id?: string;
+  company_name?: string;
   day?: number;
   month?: number;
   current_year?: number;
@@ -23,11 +23,11 @@ export interface GameStateData {
  */
 export const saveGameState = async (gameState: Partial<GameStateData>): Promise<void> => {
   try {
-    const companyId = getCurrentCompanyId();
-    if (!companyId) return;
+    const companyName = getCurrentCompanyName();
+    if (!companyName) return;
 
     const dataToSave: GameStateData = {
-      id: companyId,
+      company_name: companyName,
       ...gameState,
       updated_at: new Date().toISOString()
     };
@@ -48,13 +48,13 @@ export const saveGameState = async (gameState: Partial<GameStateData>): Promise<
  */
 export const loadGameState = async (): Promise<GameStateData | null> => {
   try {
-    const companyId = getCurrentCompanyId();
-    if (!companyId) return null;
+    const companyName = getCurrentCompanyName();
+    if (!companyName) return null;
 
     const { data, error } = await supabase
       .from(GAME_STATE_TABLE)
       .select('*')
-      .eq('id', companyId)
+      .eq('company_name', companyName)
       .single();
 
     if (error) {

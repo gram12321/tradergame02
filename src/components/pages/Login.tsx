@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useLoadingState } from '@/hooks';
 import { Button, Input, Label, Card, CardContent, CardDescription, CardHeader, CardTitle, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, ScrollArea, StartingConditionsModal } from '../ui';
-import { Building2, Trophy, User, UserPlus } from 'lucide-react';
-import { companyService, highscoreService, createNewCompany, authService } from '@/lib/services';
-import { type Company, type HighscoreEntry, type AuthUser, insertUser } from '@/lib/database';
+import { Building2, Trophy } from 'lucide-react';
+import { companyService, highscoreService, createNewCompany } from '@/lib/services';
+import { type Company, type HighscoreEntry, getCompanyByName } from '@/lib/database';
 import { formatNumber } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import readmeContent from '../../../readme.md?raw';
@@ -14,14 +14,22 @@ interface LoginProps extends CompanyProps {
   onCompanySelected: (company: Company) => void;
 }
 
+// localStorage keys
+const PREVIOUSLY_USED_COMPANIES_KEY = 'previouslyUsedCompanies';
+const LAST_COMPANY_NAME_KEY = 'lastCompanyName';
+
+// Interface for previously used company info
+interface PreviouslyUsedCompany {
+  name: string;
+  lastUsed: number; // timestamp
+}
+
 export function Login({ onCompanySelected }: LoginProps) {
   // State
   const { isLoading, withLoading } = useLoadingState();
   const [error, setError] = useState('');
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
-  const [currentCompany, setCurrentCompany] = useState<Company | null>(null);
-  const [showCreateUser, setShowCreateUser] = useState(false);
-  const [newUserName, setNewUserName] = useState('');
+  const [newCompanyName, setNewCompanyName] = useState('');
+  const [previouslyUsedCompanies, setPreviouslyUsedCompanies] = useState<PreviouslyUsedCompany[]>([]);
   const [highscores, setHighscores] = useState<{
     company_value: HighscoreEntry[];
   }>({
@@ -33,46 +41,44 @@ export function Login({ onCompanySelected }: LoginProps) {
   const [showStartingConditions, setShowStartingConditions] = useState(false);
   const [pendingCompany, setPendingCompany] = useState<Company | null>(null);
 
-  useEffect(() => {
-    // Set up auth state listener
-    const unsubscribe = authService.onAuthStateChange((user) => {
-      setCurrentUser(user);
-    });
-    
-    loadHighscores();
-    
-    return unsubscribe;
-  }, []);
-
-  // Load company when user state changes (1:1 relationship)
-  useEffect(() => {
-    if (currentUser) {
-      loadUserCompany();
+  // Load previously used companies from localStorage
+  const loadPreviouslyUsedCompanies = (): PreviouslyUsedCompany[] => {
+    try {
+      const stored = localStorage.getItem(PREVIOUSLY_USED_COMPANIES_KEY);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch (error) {
+      console.error('Error loading previously used companies:', error);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser]);
+    return [];
+  };
 
-  const loadUserCompany = async () => {
-    if (!currentUser) return;
-    
-    // 1:1 relationship - each user has exactly one company
-    const company = await companyService.getUserCompany(currentUser.id);
-    
-    if (company) {
-      setCurrentCompany(company);
+  // Save company to previously used list
+  const addToPreviouslyUsed = (company: Company) => {
+    try {
+      const existing = loadPreviouslyUsedCompanies();
+      // Remove if already exists
+      const filtered = existing.filter(c => c.name !== company.name);
+      // Add to front with current timestamp
+      const updated = [
+        { name: company.name, lastUsed: Date.now() },
+        ...filtered
+      ].slice(0, 10); // Keep only last 10
       
-      // Attempt auto-login to last active company if it belongs to this user
-      try {
-        const lastCompanyId = localStorage.getItem('lastCompanyId');
-        if (lastCompanyId === company.id) {
-          onCompanySelected(company);
-        }
-      } catch {}
-    } else {
-      // No company exists for this user yet
-      setCurrentCompany(null);
+      localStorage.setItem(PREVIOUSLY_USED_COMPANIES_KEY, JSON.stringify(updated));
+      setPreviouslyUsedCompanies(updated);
+    } catch (error) {
+      console.error('Error saving previously used company:', error);
     }
   };
+
+  useEffect(() => {
+    // Load previously used companies
+    setPreviouslyUsedCompanies(loadPreviouslyUsedCompanies());
+    
+    loadHighscores();
+  }, []);
 
   const loadHighscores = () => withLoading(async () => {
     const companyValue = await highscoreService.getHighscores('company_value', 5);
@@ -82,59 +88,37 @@ export function Login({ onCompanySelected }: LoginProps) {
     });
   });
 
-  const handleCreateUser = (e: React.FormEvent) => withLoading(async () => {
+  const handleCreateCompany = (e: React.FormEvent) => withLoading(async () => {
     e.preventDefault();
     setError('');
 
-    if (!newUserName.trim()) {
-      setError('Please enter a username');
+    const companyName = newCompanyName.trim();
+    if (!companyName) {
+      setError('Please enter a company name');
       return;
     }
 
-    const result = await insertUser({
-      name: newUserName.trim(),
-      created_at: new Date().toISOString()
-    });
-
-    if (result.success && result.data) {
-      const newUser: AuthUser = {
-        id: result.data.id,
-        email: result.data.email,
-        name: result.data.name,
-        avatar: result.data.avatar,
-        avatarColor: result.data.avatar_color,
-        createdAt: new Date(result.data.created_at),
-        updatedAt: new Date(result.data.updated_at)
-      };
-      
-      // Auto-create company for user (1:1 relationship - user name = company name)
-      const company = await createNewCompany(newUser.id, newUser.name);
-      
-      setNewUserName('');
-      setShowCreateUser(false);
-      setCurrentUser(newUser);
-      
-      if (company) {
-        // Store pending company and show starting conditions modal
-        setPendingCompany(company);
-        setShowStartingConditions(true);
-      }
-    } else {
-      setError(result.error || 'Failed to create user');
-    }
-  });
-
-  const handleCreateCompany = async () => {
-    if (!currentUser) {
-      setError('Please create a user first (User=Company relationship requires a user)');
+    // Check if company name already exists - treat as login if it does
+    const existingCompany = await getCompanyByName(companyName);
+    if (existingCompany) {
+      // Company exists - treat as login
+      addToPreviouslyUsed(existingCompany);
+      localStorage.setItem(LAST_COMPANY_NAME_KEY, existingCompany.name);
+      setNewCompanyName('');
+      // Auto-select the company
+      onCompanySelected(existingCompany);
       return;
     }
 
-    // User=Company: company name = user name (1:1 relationship)
-    const company = await createNewCompany(currentUser.id, currentUser.name);
-
+    // Company doesn't exist - create new company
+    const company = await createNewCompany(companyName);
+    
+    setNewCompanyName('');
+    
     if (company) {
-      setCurrentCompany(company);
+      // Add to previously used list
+      addToPreviouslyUsed(company);
+      localStorage.setItem(LAST_COMPANY_NAME_KEY, company.name);
       
       // Store pending company and show starting conditions modal
       setPendingCompany(company);
@@ -142,8 +126,8 @@ export function Login({ onCompanySelected }: LoginProps) {
     } else {
       setError('Failed to create company');
     }
-  };
-  
+  });
+
   const handleStartingConditionsComplete = async (startingMoney?: number) => {
     setShowStartingConditions(false);
     
@@ -152,10 +136,6 @@ export function Login({ onCompanySelected }: LoginProps) {
         ? { ...pendingCompany, money: startingMoney }
         : pendingCompany;
  
-       // Reload user company (1:1 relationship)
-       if (currentUser) {
-         await loadUserCompany();
-       }
  
        // Select the company and navigate to game
        onCompanySelected(companyToSelect);
@@ -164,21 +144,60 @@ export function Login({ onCompanySelected }: LoginProps) {
   };
 
   const handleSelectCompany = (company: Company) => {
+    addToPreviouslyUsed(company);
+    localStorage.setItem(LAST_COMPANY_NAME_KEY, company.name);
     onCompanySelected(company);
   };
 
-  const handleDeleteCompany = (companyId: string, event: React.MouseEvent) => withLoading(async () => {
+      const handleSelectPreviouslyUsedCompany = (companyName: string) => withLoading(async () => {
+    setError('');
+    const company = await companyService.getCompany(companyName);
+    if (company) {
+      handleSelectCompany(company);
+    } else {
+      setError('Company not found');
+      // Remove from previously used list if it doesn't exist
+      const updated = previouslyUsedCompanies.filter(c => c.name !== companyName);
+      setPreviouslyUsedCompanies(updated);
+      try {
+        localStorage.setItem(PREVIOUSLY_USED_COMPANIES_KEY, JSON.stringify(updated));
+      } catch (error) {
+        console.error('Error updating previously used companies:', error);
+      }
+    }
+  });
+
+  const handleDeleteCompany = (companyName: string, event: React.MouseEvent) => withLoading(async () => {
     event.stopPropagation(); // Prevent card click from triggering
     
-    if (deletingCompany === companyId) {
+    if (deletingCompany === companyName) {
       // Confirm delete - second click
       setError('');
 
-      const result = await companyService.deleteCompany(companyId);
+      const result = await companyService.deleteCompany(companyName);
       
       if (result.success) {
         setDeletingCompany(null);
-        setCurrentCompany(null);
+        
+        // Remove from previously used companies list
+        const updated = previouslyUsedCompanies.filter(c => c.name !== companyName);
+        setPreviouslyUsedCompanies(updated);
+        try {
+          localStorage.setItem(PREVIOUSLY_USED_COMPANIES_KEY, JSON.stringify(updated));
+        } catch (error) {
+          console.error('Error updating previously used companies:', error);
+        }
+        
+        // Clear lastCompanyName if this was the last company
+        try {
+          const lastCompanyName = localStorage.getItem(LAST_COMPANY_NAME_KEY);
+          if (lastCompanyName === companyName) {
+            localStorage.removeItem(LAST_COMPANY_NAME_KEY);
+          }
+        } catch (error) {
+          console.error('Error clearing lastCompanyName:', error);
+        }
+        
         // Refresh the page to ensure clean state
         window.location.reload();
       } else {
@@ -187,7 +206,7 @@ export function Login({ onCompanySelected }: LoginProps) {
       }
     } else {
       // First click - show confirmation state
-      setDeletingCompany(companyId);
+      setDeletingCompany(companyName);
       
       // Auto-reset confirmation state after 5 seconds
       setTimeout(() => {
@@ -238,139 +257,90 @@ export function Login({ onCompanySelected }: LoginProps) {
       <div className="w-full max-w-2xl bg-white/10 backdrop-blur-sm rounded-xl p-4 shadow-xl border border-white/20">
         {/* Header */}
         <div className="text-center mb-4">
-          <h1 className="text-xl font-bold mb-1 text-wine drop-shadow-lg">Welcome to Winemaker</h1>
+          <h1 className="text-xl font-bold mb-1 text-wine drop-shadow-lg">Welcome to TraderGame</h1>
           <p className="text-muted-foreground text-xs drop-shadow-md">
-            Manage your wine empire and compete with other vintners
+            Enter your company name to login or create a new company
           </p>
-          {currentUser && (
-            <div className="mt-2 flex items-center justify-center gap-2 text-xs">
-              <User className="h-3 w-3 text-wine" />
-              <span className="text-wine font-medium">{currentUser.name}</span>
-            </div>
-          )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
-          {/* Main Content */}
-          <div className="lg:col-span-3">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          {/* Main Login Interface */}
+          <div className="lg:col-span-2">
             <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl text-sm">
               <CardHeader className="py-3 px-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2 text-wine text-base">
-                      <Building2 className="h-4 w-4" />
-                      {currentUser ? 'My Company' : 'Get Started'}
-                    </CardTitle>
-                    <CardDescription className="text-xs">
-                      {currentUser 
-                        ? currentCompany 
-                          ? 'Select your company to continue'
-                          : 'Create your company to start playing'
-                        : 'Create a user to get started'}
-                    </CardDescription>
-                  </div>
-                </div>
+                <CardTitle className="flex items-center gap-2 text-wine text-base">
+                  <Building2 className="h-4 w-4" />
+                  Login / Create Company
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Enter your company name to login or create a new company
+                </CardDescription>
               </CardHeader>
               <CardContent className="px-4 py-3">
-                {/* Current User's Company */}
-                {currentUser && currentCompany && (
-                  <div className="mb-4">
-                    <Card 
-                      className="hover:bg-accent/50 transition-colors cursor-pointer"
-                      onClick={() => handleSelectCompany(currentCompany)}
-                    >
-                      <CardContent className="p-3">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <h4 className="font-medium">{currentCompany.name}</h4>
-                            <p className="text-xs text-muted-foreground">
-                              Day {currentCompany.currentDay}, Month {currentCompany.currentMonth}, {currentCompany.currentYear}
-                            </p>
-                            <p className="text-xs">
-                              {formatNumber(currentCompany.money, { currency: true, decimals: 0 })}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={(e) => handleDeleteCompany(currentCompany.id, e)}
-                              className={`p-1 rounded hover:bg-destructive/10 transition-colors text-xs ${
-                                deletingCompany === currentCompany.id ? 'text-destructive animate-pulse bg-destructive/10' : 'text-muted-foreground'
-                              }`}
-                              title={deletingCompany === currentCompany.id ? 'Click again to confirm deletion' : 'Delete company'}
-                            >
-                              🗑️
-                            </button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
+                {/* Previously Used Companies - Prominently displayed */}
+                {previouslyUsedCompanies.length > 0 && (
+                  <div className="mb-4 pb-4 border-b">
+                    <Label className="text-xs font-semibold text-wine mb-2 block">Previously Used Companies</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {previouslyUsedCompanies.map((prevCompany) => (
+                        <Card
+                          key={prevCompany.name}
+                          className="hover:bg-accent/50 transition-colors border-wine/20"
+                        >
+                          <CardContent className="p-2.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <div 
+                                className="flex-1 cursor-pointer"
+                                onClick={() => handleSelectPreviouslyUsedCompany(prevCompany.name)}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm font-medium truncate">{prevCompany.name}</span>
+                                  <span className="text-xs text-muted-foreground ml-2">
+                                    {new Date(prevCompany.lastUsed).toLocaleDateString()}
+                                  </span>
+                                </div>
+                              </div>
+                              <button
+                                onClick={(e) => handleDeleteCompany(prevCompany.name, e)}
+                                className={`p-1 rounded hover:bg-destructive/10 transition-colors text-xs flex-shrink-0 ${
+                                  deletingCompany === prevCompany.name ? 'text-destructive animate-pulse bg-destructive/10' : 'text-muted-foreground'
+                                }`}
+                                title={deletingCompany === prevCompany.name ? 'Click again to confirm deletion' : 'Delete company'}
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
                   </div>
                 )}
 
-                {/* Create User */}
-                {!currentUser && (
-                  <div className="pt-3 border-t">
-                    {!showCreateUser ? (
-                      <Button 
-                        onClick={() => setShowCreateUser(true)}
-                        className="w-full border-wine text-wine hover:bg-wine hover:text-white text-sm"
-                        variant="outline"
-                      >
-                        <UserPlus className="h-4 w-4 mr-2" />
-                        Create New User & Company
-                      </Button>
-                    ) : (
-                      <form onSubmit={handleCreateUser} className="space-y-3">
-                        <div>
-                          <Label htmlFor="newUserName">User Name (will also be your Company Name)</Label>
-                          <Input
-                            id="newUserName"
-                            value={newUserName}
-                            onChange={(e) => setNewUserName(e.target.value)}
-                            placeholder="Enter your username"
-                            required
-                          />
-                        </div>
-                        <div className="flex gap-2">
-                          <Button 
-                            type="submit" 
-                            disabled={isLoading}
-                            className="bg-wine hover:bg-wine-dark text-white text-sm"
-                          >
-                            {isLoading ? 'Creating...' : 'Create User & Company'}
-                          </Button>
-                          <Button 
-                            type="button" 
-                            variant="outline"
-                            onClick={() => {
-                              setShowCreateUser(false);
-                              setNewUserName('');
-                            }}
-                            className="border-wine text-wine hover:bg-wine hover:text-white text-sm"
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </form>
-                    )}
-                  </div>
-                )}
-
-                {/* Create Company (if user exists but no company) */}
-                {currentUser && !currentCompany && (
-                  <div className="pt-3 border-t">
-                    <Button 
-                      onClick={handleCreateCompany}
-                      disabled={isLoading}
-                      className="w-full bg-wine hover:bg-wine-dark text-white text-sm"
-                    >
-                      {isLoading ? 'Creating...' : 'Create Company'}
-                    </Button>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Your company will be named: <strong>{currentUser.name}</strong>
+                {/* Login/Create Form - Always visible */}
+                <form onSubmit={handleCreateCompany} className="space-y-3">
+                  <div>
+                    <Label htmlFor="newCompanyName">Company Name</Label>
+                    <Input
+                      id="newCompanyName"
+                      value={newCompanyName}
+                      onChange={(e) => setNewCompanyName(e.target.value)}
+                      placeholder="Enter company name (login if exists)"
+                      required
+                      autoFocus
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      If the company exists, you'll be logged in. Otherwise, a new company will be created.
                     </p>
                   </div>
-                )}
+                  <Button 
+                    type="submit" 
+                    disabled={isLoading}
+                    className="w-full bg-wine hover:bg-wine-dark text-white text-sm"
+                  >
+                    {isLoading ? 'Processing...' : 'Login / Create Company'}
+                  </Button>
+                </form>
 
                 {error && (
                   <div className="mt-3 text-xs text-destructive bg-destructive/10 p-2.5 rounded-md">
@@ -381,7 +351,7 @@ export function Login({ onCompanySelected }: LoginProps) {
             </Card>
           </div>
 
-          {/* Sidebar */}
+          {/* Sidebar - Highscores and Info */}
           <div className="space-y-3">
             {/* Highscores */}
             <div className="grid grid-cols-1 gap-2.5">
@@ -393,9 +363,7 @@ export function Login({ onCompanySelected }: LoginProps) {
               <CardContent className="p-3">
                 <h3 className="font-medium mb-1.5 text-wine">Getting Started</h3>
                 <div className="text-xs text-muted-foreground space-y-1.5">
-                  <p>• Create a user to start</p>
-                  <p>• Each user has one company</p>
-                  <p>• Your username is your company name</p>
+                  <p>• Enter a company name to login or create</p>
                   <p>• Compete on the global leaderboards</p>
                 </div>
               </CardContent>
@@ -480,7 +448,6 @@ export function Login({ onCompanySelected }: LoginProps) {
             setShowStartingConditions(false);
             setPendingCompany(null);
           }}
-          companyId={pendingCompany.id}
           companyName={pendingCompany.name}
           onComplete={handleStartingConditionsComplete}
         />

@@ -4,11 +4,10 @@ export * from './core/notificationService';
 export * from './core/gameTick';
 export * from './core/startingConditionsService';
 
-// User services
-export * from './user/authService';
-export * from './user/companyService';
-export * from './user/highscoreService';
-export * from './user/userSettingsService'; 
+// Company services
+export * from './company/companyService';
+export * from './company/highscoreService';
+export * from './company/companySettingsService'; 
 
 // Finance services
 export * from './finance/financeService';

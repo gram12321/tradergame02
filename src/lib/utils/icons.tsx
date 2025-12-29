@@ -68,7 +68,7 @@ export const EMOJI_OPTIONS: readonly string[] = [
   '🏢', '🏭', '🌍', '🌱', '🌿', '🍃', '🌺', '🌻', '🌸', '🌷'
 ];
 
-// Avatar options for user profiles
+// Avatar options for company profiles
 export const AVATAR_OPTIONS = [
   { id: 'default', emoji: '👤', label: 'Default' },
   { id: 'businessman', emoji: '👨‍💼', label: 'Businessman' },

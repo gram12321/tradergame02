@@ -1,11 +1,10 @@
-import { getGameState, updateGameState } from '../core/gameState';
+import { getGameState, getCurrentCompanyName } from '../core/gameState';
 import type { Transaction } from '@/lib/types/types';
 import { GAME_INITIALIZATION } from '@/lib/constants';
-import { DAYS_PER_MONTH, MONTHS_PER_YEAR } from '@/lib/constants/timeConstants';
+import { DAYS_PER_MONTH, MONTHS_PER_YEAR } from '@/lib/constants/constants';
 import { CAPITAL_FLOW_TRANSACTION_CATEGORIES } from '@/lib/constants/financeConstants';
-import { getCurrentCompanyId } from '../core/gameState';
 import { triggerGameUpdate } from '../../../hooks/useGameUpdates';
-import { companyService } from '../user/companyService';
+import { companyService } from '../company/companyService';
 import { insertTransaction as insertTransactionDB, loadTransactions as loadTransactionsDB, type TransactionData } from '@/lib/database';
 import { calculateAbsoluteDays } from '@/lib/utils/utils';
 
@@ -32,30 +31,32 @@ export const addTransaction = async (
   description: string,
   category: string,
   recurring = false,
-  companyId?: string
+  companyName?: string
 ): Promise<string> => {
   try {
-    if (!companyId) {
-      companyId = getCurrentCompanyId();
+    if (!companyName) {
+      companyName = getCurrentCompanyName();
     }
     
-    let currentMoney = 0;
-    if (companyId) {
-      const company = await companyService.getCompany(companyId);
-      if (company) {
-        currentMoney = company.money;
-      }
-    } else {
-      const gameState = getGameState();
-      currentMoney = gameState.money || 0;
+    if (!companyName) {
+      throw new Error('Company name is required to add a transaction');
     }
     
-    const newMoney = currentMoney + amount;
+    const company = await companyService.getCompany(companyName);
+    if (!company) {
+      throw new Error(`Company not found: ${companyName}`);
+    }
     
+    const newMoney = company.money + amount;
     const gameState = getGameState();
     
+    const updateResult = await companyService.updateCompany(companyName, { money: newMoney });
+    if (!updateResult.success) {
+      throw new Error(updateResult.error || 'Failed to update company money');
+    }
+    
     const transactionData: TransactionData = {
-      company_id: companyId,
+      company_name: companyName,
       amount,
       description,
       category,
@@ -66,16 +67,13 @@ export const addTransaction = async (
       year: gameState.year || GAME_INITIALIZATION.STARTING_YEAR
     };
     
-    await updateGameState({ money: newMoney });
-    
-    triggerGameUpdate();
-    
     const result = await insertTransactionDB(transactionData);
     
     if (!result.success || !result.data) {
       throw new Error(result.error || 'Failed to insert transaction');
     }
     
+    // Update cache
     const newTransaction: Transaction = {
       id: result.data.id,
       date: {
@@ -100,6 +98,9 @@ export const addTransaction = async (
       // For same day transactions, sort by ID (newer transactions have higher IDs)
       return b.id.localeCompare(a.id);
     });
+    
+    // Update game state for UI
+    triggerGameUpdate();
     
     return result.data.id;
   } catch (error) {

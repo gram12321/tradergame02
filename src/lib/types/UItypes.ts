@@ -16,7 +16,7 @@ export interface NavigationProps {
 // Company-related props
 export interface CompanyProps {
   currentCompany?: any | null;
-  currentCompanyId?: string;
+  currentCompanyName?: string;
   onCompanySelected?: (company: any) => void;
 }
 

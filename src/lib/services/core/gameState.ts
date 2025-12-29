@@ -1,9 +1,10 @@
 // Enhanced game state service that integrates with the new company system
 import { GameState } from '../../types/types';
 import { GAME_INITIALIZATION } from '../../constants/constants';
-import { companyService } from '../user/companyService';
+import { companyService } from '../company/companyService';
 import { Company } from '@/lib/database';
 import { triggerGameUpdate } from '../../../hooks/useGameUpdates';
+import { applyStartingConditions } from './startingConditionsService';
 // Current active company and game state
 let currentCompany: Company | null = null;
 let gameState: Partial<GameState> = {
@@ -15,19 +16,19 @@ let gameState: Partial<GameState> = {
 };
 
 // Persistence key
-const LAST_COMPANY_ID_KEY = 'lastCompanyId';
+const LAST_COMPANY_NAME_KEY = 'lastCompanyName';
 
-function setLastCompanyId(companyId: string): void {
+function setLastCompanyName(companyName: string): void {
   try {
-    localStorage.setItem(LAST_COMPANY_ID_KEY, companyId);
+    localStorage.setItem(LAST_COMPANY_NAME_KEY, companyName);
   } catch (error) {
     // no-op
   }
 }
 
-function clearLastCompanyId(): void {
+function clearLastCompanyName(): void {
   try {
-    localStorage.removeItem(LAST_COMPANY_ID_KEY);
+    localStorage.removeItem(LAST_COMPANY_NAME_KEY);
   } catch (error) {
     // no-op
   }
@@ -43,15 +44,15 @@ export const getCurrentCompany = (): Company | null => {
 };
 
 /**
- * Get current company ID - fails fast if no company is active
+ * Get current company name - fails fast if no company is active
  * This prevents silent failures when operations run against non-existent companies
  */
-export const getCurrentCompanyId = (): string => {
+export const getCurrentCompanyName = (): string => {
   const company = getCurrentCompany();
-  if (!company?.id) {
+  if (!company?.name) {
     throw new Error('No active company found. Please select or create a company before performing this action.');
   }
-  return company.id;
+  return company.name;
 };
 
 export const updateGameState = async (updates: Partial<GameState>): Promise<void> => {
@@ -68,7 +69,7 @@ export const updateGameState = async (updates: Partial<GameState>): Promise<void
     
     if (Object.keys(companyUpdates).length > 0) {
       try {
-        await companyService.updateCompany(currentCompany.id, companyUpdates);
+        await companyService.updateCompany(currentCompany.name, companyUpdates);
         
         // Update our local company object
         currentCompany = { ...currentCompany, ...companyUpdates };
@@ -89,14 +90,14 @@ export const updateGameState = async (updates: Partial<GameState>): Promise<void
 
 export const setActiveCompany = async (company: Company): Promise<void> => {
   // Check if this is the same company that's already active
-  if (currentCompany && currentCompany.id === company.id) {
+  if (currentCompany && currentCompany.name === company.name) {
     return;
   }
   
   currentCompany = company;
   
-  // Persist only the lastCompanyId for autologin
-  setLastCompanyId(company.id);
+  // Persist only the lastCompanyName for autologin
+  setLastCompanyName(company.name);
   
   // Update local game state to match company
   gameState = {
@@ -112,35 +113,21 @@ export const setActiveCompany = async (company: Company): Promise<void> => {
 };
 
 /**
- * Load user's company (1:1 relationship - each user has exactly one company)
- * Called automatically on login
+ * Create company
  */
-export const loadUserCompany = async (userId: string): Promise<Company | null> => {
-  try {
-    const company = await companyService.getUserCompany(userId);
-    if (company) {
-      await setActiveCompany(company);
-      return company;
-    }
-    return null;
-  } catch (error) {
-    console.error('Error loading user company:', error);
-    return null;
-  }
-};
-
-/**
- * Create company for user (1:1 relationship)
- * User name and company name are the same
- */
-export const createNewCompany = async (userId: string, companyName: string): Promise<Company | null> => {
+export const createNewCompany = async (companyName: string): Promise<Company | null> => {
   try {
     const result = await companyService.createCompany({
-      name: companyName,
-      userId
+      name: companyName
     });
     
     if (result.success && result.company) {
+      await applyStartingConditions(result.company.name);
+      const updatedCompany = await companyService.getCompany(result.company.name);
+      if (updatedCompany) {
+        await setActiveCompany(updatedCompany);
+        return updatedCompany;
+      }
       await setActiveCompany(result.company);
       return result.company;
     } else {
@@ -164,11 +151,11 @@ export const resetGameState = (): void => {
     money: 0
   };
   
-  // Clear the lastCompanyId to prevent autologin
-  clearLastCompanyId();
+  // Clear the lastCompanyName to prevent autologin
+  clearLastCompanyName();
 };
 
-// Export clearLastCompanyId for explicit logout handling
-export const clearLastCompanyIdForLogout = (): void => {
-  clearLastCompanyId();
+// Export clearLastCompanyName for explicit logout handling
+export const clearLastCompanyNameForLogout = (): void => {
+  clearLastCompanyName();
 };

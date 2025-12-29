@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/utils/supabase';
+import { resetGameTimeToInitial } from '@/lib/database/core/gameTimeDB';
 
 /**
  * Admin service - Administrative operations for game management
@@ -6,6 +7,7 @@ import { supabase } from '@/lib/utils/supabase';
 
 /**
  * Clear all companies from the database
+ * Also resets game time to 1.1.2024
  */
 export async function adminClearAllCompanies(): Promise<void> {
   try {
@@ -19,8 +21,29 @@ export async function adminClearAllCompanies(): Promise<void> {
     if (error) {
       throw new Error(`Failed to clear all companies: ${error.message}`);
     }
+
+    // Reset game time to initial values (1.1.2024)
+    const timeReset = await resetGameTimeToInitial();
+    if (!timeReset) {
+      console.warn('Failed to reset game time after clearing companies');
+    }
   } catch (error: any) {
     throw new Error(`Failed to clear all companies: ${error.message || error}`);
+  }
+}
+
+/**
+ * Reset game time to initial values (1.1.2024)
+ * Does not affect other database data
+ */
+export async function adminResetGameTime(): Promise<void> {
+  try {
+    const success = await resetGameTimeToInitial();
+    if (!success) {
+      throw new Error('Failed to reset game time');
+    }
+  } catch (error: any) {
+    throw new Error(`Failed to reset game time: ${error.message || error}`);
   }
 }
 

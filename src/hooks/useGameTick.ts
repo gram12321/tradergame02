@@ -20,13 +20,13 @@ export function useGameTick({
   const [gameState, setGameState] = useState(getGameState());
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const handleAdvanceTick = useCallback(() => {
+  const handleAdvanceTick = useCallback(async () => {
     if (isProcessing || gameState.isProcessing) return;
 
     setIsProcessing(true);
     try {
       // Use manual tick to preserve the scheduled automatic tick time
-      processGameTickManual();
+      await processGameTickManual();
       setGameState(getGameState());
       
       // TODO: Process facilities here when facility system is implemented
@@ -50,14 +50,28 @@ export function useGameTick({
       return () => clearInterval(updateInterval);
     }
 
-    const checkAutoAdvance = () => {
+    const checkAutoAdvance = async () => {
       const state = getGameState();
       const now = new Date();
       const nextTick = new Date(state.time.nextTickTime);
 
-      // If it's time for automatic advancement (3600 seconds passed)
-      if (now >= nextTick && !state.isProcessing) {
-        handleAdvanceTick();
+      // If it's time for automatic advancement (hour boundary reached)
+      if (now >= nextTick && !state.isProcessing && !isProcessing) {
+        setIsProcessing(true);
+        try {
+          // Use automatic tick which updates nextTickTime
+          await processGameTick();
+          setGameState(getGameState());
+          
+          // TODO: Process facilities here when facility system is implemented
+          if (onFacilitiesUpdate) {
+            onFacilitiesUpdate(facilities);
+          }
+        } catch (error) {
+          console.error('Error processing automatic game tick:', error);
+        } finally {
+          setIsProcessing(false);
+        }
       }
     };
 

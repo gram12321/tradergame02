@@ -5,6 +5,9 @@ export {
   processGameTickManual,
   setProcessingState,
   setCurrentCompanyForNotifications,
+  initializeGameState,
+  cleanupGameState,
+  addGameStateListener,
 } from './gameState';
 
 export { getTimeUntilNextTick } from './gametick';

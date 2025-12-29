@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Header } from '@/components/layout';
 import { Login } from '@/components/pages/login';
 import { CompanyOverview } from '@/components/pages/company-overview';
@@ -8,10 +8,21 @@ import { Settings } from '@/components/pages/settings';
 import { AdminDashboard } from '@/components/pages/adminDashboard';
 import { Achievements } from '@/components/pages/achievements';
 import { Highscores } from '@/components/pages/highscores';
-import { setCurrentCompanyForNotifications, notificationService } from '@/lib/services/core';
+import { setCurrentCompanyForNotifications, notificationService, initializeGameState, cleanupGameState } from '@/lib/services/core';
 import type { Facility } from '@/lib/types/types';
 
 function App() {
+  // Initialize game state from database on mount
+  useEffect(() => {
+    initializeGameState().catch((error) => {
+      console.error('Failed to initialize game state:', error);
+    });
+
+    // Cleanup on unmount
+    return () => {
+      cleanupGameState();
+    };
+  }, []);
   const [currentPage, setCurrentPage] = useState('login');
   const [currentCompany, setCurrentCompany] = useState<any>(null);
   const [facilities, setFacilities] = useState<Facility[]>([]);

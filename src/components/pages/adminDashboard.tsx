@@ -1,8 +1,8 @@
 import { useLoadingState } from '@/hooks';
 import { SimpleCard, Button, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui';
-import { Settings, Trash2 } from 'lucide-react';
+import { Settings, Trash2, Clock } from 'lucide-react';
 import { PageProps, NavigationProps } from '@/lib/types/UItypes';
-import { adminClearAllCompanies } from '@/lib/services';
+import { adminClearAllCompanies, adminResetGameTime } from '@/lib/services';
 
 interface AdminDashboardProps extends PageProps, NavigationProps {}
 
@@ -26,6 +26,14 @@ export function AdminDashboard({ onBack, onNavigateToLogin }: AdminDashboardProp
       onNavigateToLogin();
     }
     // Force a full page reload to ensure clean state
+    setTimeout(() => {
+      window.location.reload();
+    }, 500);
+  });
+
+  const handleResetGameTime = () => withLoading(async () => {
+    await adminResetGameTime();
+    // Reload to sync the new time
     setTimeout(() => {
       window.location.reload();
     }, 500);
@@ -75,7 +83,25 @@ export function AdminDashboard({ onBack, onNavigateToLogin }: AdminDashboardProp
                   Clear All Accounts
                 </Button>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Removes all companies from the database.
+                  Removes all companies and resets game time to 1.1.2024.
+                </p>
+              </SimpleCard>
+
+              <SimpleCard
+                title="Game Time"
+                description="Reset game time to initial"
+              >
+                <Button
+                  variant="destructive"
+                  onClick={handleResetGameTime}
+                  disabled={isLoading}
+                  className="w-full"
+                >
+                  <Clock className="h-4 w-4 mr-2" />
+                  Reset Game Time
+                </Button>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Resets game time to Day 1, Month 1, Year 2024. Does not affect other data.
                 </p>
               </SimpleCard>
             </div>

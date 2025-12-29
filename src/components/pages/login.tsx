@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Building2, Trophy } from 'lucide-react';
+import { Building2, Trophy, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { Input } from '@/components/ui/shadCN/input';
 import { Label } from '@/components/ui/shadCN/label';
@@ -9,6 +9,8 @@ import { ScrollArea } from '@/components/ui/shadCN/scroll-area';
 import { getOrCreateCompany } from '@/lib/services/user/companyService';
 import { getCompanyByName, type Company } from '@/lib/database/core/companiesDB';
 import { useLoadingState } from '@/hooks/useLoadingState';
+import { getGameState, addGameStateListener, initializeGameState } from '@/lib/services/core';
+import { formatGameDateFromObject } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import readmeContent from '../../../readme.md?raw';
 import versionLogContent from '../../../docs/versionlog.md?raw';
@@ -34,6 +36,20 @@ export function Login({ onCompanySelected }: LoginProps) {
   const [deletingCompany, setDeletingCompany] = useState<string | null>(null);
   const [isReadmeOpen, setIsReadmeOpen] = useState(false);
   const [isVersionLogOpen, setIsVersionLogOpen] = useState(false);
+  const [gameState, setGameState] = useState(getGameState());
+
+  // Initialize game state and subscribe to updates
+  useEffect(() => {
+    // Initialize game state if not already done
+    initializeGameState().catch(console.error);
+
+    // Subscribe to game state changes
+    const unsubscribe = addGameStateListener((newState) => {
+      setGameState(newState);
+    });
+
+    return unsubscribe;
+  }, []);
 
   // Load previously used companies from localStorage
   const loadPreviouslyUsedCompanies = (): PreviouslyUsedCompany[] => {
@@ -173,9 +189,14 @@ export function Login({ onCompanySelected }: LoginProps) {
         {/* Header */}
         <div className="text-center mb-4">
           <h1 className="text-xl font-bold mb-1 text-wine drop-shadow-lg">Welcome to TraderGame</h1>
-          <p className="text-muted-foreground text-xs drop-shadow-md">
+          <p className="text-muted-foreground text-xs drop-shadow-md mb-2">
             Enter your company name to login or create a new company
           </p>
+          {/* Current Game Date */}
+          <div className="flex items-center justify-center gap-1.5 text-xs text-white/90 drop-shadow-md">
+            <Calendar className="h-3.5 w-3.5" />
+            <span className="font-medium">{formatGameDateFromObject(gameState.time)}</span>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">

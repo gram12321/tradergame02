@@ -1,21 +1,18 @@
 import type { GameState, GameTime } from '@/lib/types/types';
 import { DAYS_PER_MONTH, MONTHS_PER_YEAR, GAME_INITIALIZATION } from '@/lib/constants';
 import { notificationService } from './notificationService';
+import { saveGameTimeToDB, getGameTimeFromDB } from '@/lib/database/core/gameTimeDB';
+import { supabase } from '@/lib/utils/supabase';
 
-/**
- * Get the next hour boundary (e.g., if it's 2:30 PM, returns 3:00 PM)
- */
-function getNextHourBoundary(): Date {
+export function getNextHourBoundary(): Date {
   const now = new Date();
-  const nextHour = new Date(now);
-  nextHour.setMinutes(0);
-  nextHour.setSeconds(0);
-  nextHour.setMilliseconds(0);
-  nextHour.setHours(nextHour.getHours() + 1);
-  return nextHour;
+  now.setMinutes(0, 0, 0);
+  now.setHours(now.getHours() + 1);
+  return now;
 }
 
-// Game state singleton
+type GameStateListener = (state: GameState) => void;
+
 let gameState: GameState = {
   time: {
     tick: GAME_INITIALIZATION.STARTING_TICK,
@@ -23,67 +20,142 @@ let gameState: GameState = {
     month: GAME_INITIALIZATION.STARTING_MONTH,
     year: GAME_INITIALIZATION.STARTING_YEAR,
     lastTickTime: new Date().toISOString(),
-    nextTickTime: getNextHourBoundary().toISOString(), // Next hour boundary (e.g., 3:00 PM)
+    nextTickTime: getNextHourBoundary().toISOString(),
   },
   isProcessing: false,
 };
 
-// Current company for notifications (set by the app)
 let currentCompanyForNotifications: string | null = null;
+let gameTimeSubscription: ReturnType<typeof supabase.channel> | null = null;
+let isInitialized = false;
+let initializationPromise: Promise<void> | null = null;
+let stateListeners: GameStateListener[] = [];
 
-/**
- * Get current game state
- */
+function notifyStateListeners(): void {
+  stateListeners.forEach(listener => listener({ ...gameState }));
+}
+
+export function addGameStateListener(listener: GameStateListener): () => void {
+  stateListeners.push(listener);
+  listener({ ...gameState });
+  return () => {
+    stateListeners = stateListeners.filter(l => l !== listener);
+  };
+}
+
+export async function initializeGameState(): Promise<void> {
+  if (isInitialized || initializationPromise) {
+    return initializationPromise || Promise.resolve();
+  }
+
+  initializationPromise = (async () => {
+    try {
+      const dbTime = await getGameTimeFromDB();
+      
+      if (!dbTime) {
+        console.error('Game time not found in database - using fallback');
+        const fallbackTime: GameTime = {
+          tick: GAME_INITIALIZATION.STARTING_TICK,
+          day: GAME_INITIALIZATION.STARTING_DAY,
+          month: GAME_INITIALIZATION.STARTING_MONTH,
+          year: GAME_INITIALIZATION.STARTING_YEAR,
+          lastTickTime: new Date().toISOString(),
+          nextTickTime: getNextHourBoundary().toISOString(),
+        };
+        setGameState({ ...gameState, time: fallbackTime });
+      } else {
+        setGameState({ ...gameState, time: dbTime });
+      }
+
+      setupGameTimeSubscription();
+      isInitialized = true;
+      console.log('Game state initialized:', dbTime ? 'from DB' : 'fallback');
+    } catch (error) {
+      console.error('Error initializing game state:', error);
+      isInitialized = true;
+    }
+  })();
+
+  return initializationPromise;
+}
+
+function setupGameTimeSubscription(): void {
+  if (gameTimeSubscription) return;
+
+  gameTimeSubscription = supabase
+    .channel('game_time_changes')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'game_time', filter: 'id=eq.global' },
+      (payload) => {
+        if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+          const newData = payload.new as any;
+          if (!newData) return;
+
+          const newTime: GameTime = {
+            tick: newData.tick ?? gameState.time.tick,
+            day: newData.day ?? gameState.time.day,
+            month: newData.month ?? gameState.time.month,
+            year: newData.year ?? gameState.time.year,
+            lastTickTime: newData.last_tick_time ?? gameState.time.lastTickTime,
+            nextTickTime: newData.next_tick_time ?? gameState.time.nextTickTime,
+          };
+
+          const hasChanged = newTime.tick !== gameState.time.tick ||
+                             newTime.day !== gameState.time.day ||
+                             newTime.month !== gameState.time.month ||
+                             newTime.year !== gameState.time.year;
+
+          if (hasChanged) {
+            setGameState({ ...gameState, time: newTime });
+            if (currentCompanyForNotifications) {
+              notificationService.addMessage(
+                `🔄 Game time synced: Day ${newTime.day}, Month ${newTime.month}, ${newTime.year}`,
+                'game_time_sync',
+                'Time System',
+                'time',
+                currentCompanyForNotifications
+              );
+            }
+          }
+        }
+      }
+    )
+    .subscribe();
+
+  console.log('Game time subscription established');
+}
+
 export function getGameState(): GameState {
   return { ...gameState };
 }
 
-/**
- * Set game state (internal use)
- */
 function setGameState(newState: GameState): void {
   gameState = { ...newState };
+  notifyStateListeners();
 }
 
-/**
- * Set the current company name for notifications
- * This should be called when a company logs in
- */
 export function setCurrentCompanyForNotifications(companyName: string): void {
   currentCompanyForNotifications = companyName;
 }
 
-/**
- * Advance game time by one tick
- * Updates date using constants (DAYS_PER_MONTH, MONTHS_PER_YEAR)
- * @param updateNextTickTime - If true, updates nextTickTime to 1 hour from now (for automatic ticks)
- *                              If false, preserves the existing nextTickTime (for manual ticks)
- */
 function advanceGameTime(updateNextTickTime: boolean = true): GameTime {
-  const currentTime = gameState.time;
-  let { day, month, year, tick, nextTickTime } = currentTime;
+  let { day, month, year, tick, nextTickTime } = gameState.time;
   
   tick += 1;
   day += 1;
   
-  // Check against DAYS_PER_MONTH constant
   if (day > DAYS_PER_MONTH) {
     day = 1;
     month += 1;
   }
   
-  // Check against MONTHS_PER_YEAR constant
   if (month > MONTHS_PER_YEAR) {
     month = 1;
     year += 1;
   }
   
-  const now = new Date();
-  
-  // Only update nextTickTime if this is an automatic tick
-  // Manual ticks preserve the scheduled time
   if (updateNextTickTime) {
-    // Set to next hour boundary (e.g., if it's 3:00 PM, next tick is 4:00 PM)
     nextTickTime = getNextHourBoundary().toISOString();
   }
   
@@ -92,37 +164,33 @@ function advanceGameTime(updateNextTickTime: boolean = true): GameTime {
     day,
     month,
     year,
-    lastTickTime: now.toISOString(),
+    lastTickTime: new Date().toISOString(),
     nextTickTime,
   };
 }
 
-/**
- * Process a game tick (automatic - updates nextTickTime)
- * Advances time and updates state
- * Used for automatic hourly ticks
- */
-export function processGameTick(): void {
-  if (gameState.isProcessing) {
-    return; // Prevent concurrent ticks
-  }
+async function processTickInternal(isManual: boolean): Promise<void> {
+  if (gameState.isProcessing) return;
   
   gameState.isProcessing = true;
   
   try {
-    const newTime = advanceGameTime(true); // Update nextTickTime for automatic ticks
-    setGameState({
-      ...gameState,
-      time: newTime,
-      isProcessing: false,
-    });
+    const newTime = advanceGameTime(!isManual);
     
-    // Send notification about automatic time advancement
+    const saved = await saveGameTimeToDB(newTime);
+    if (!saved) {
+      console.error('Failed to save game time to database');
+    }
+
+    setGameState({ ...gameState, time: newTime, isProcessing: false });
+    
     if (currentCompanyForNotifications) {
+      const icon = isManual ? '🎮' : '⏰';
+      const source = isManual ? 'Admin manually' : 'Time automatically';
       notificationService.addMessage(
-        `⏰ Time automatically advanced to Day ${newTime.day}, Month ${newTime.month}, ${newTime.year}`,
-        'game_time_system',
-        'Time System',
+        `${icon} ${source} advanced time to Day ${newTime.day}, Month ${newTime.month}, ${newTime.year}`,
+        isManual ? 'admin_manual_advance' : 'game_time_system',
+        isManual ? 'Admin Control' : 'Time System',
         'time',
         currentCompanyForNotifications
       );
@@ -133,49 +201,23 @@ export function processGameTick(): void {
   }
 }
 
-/**
- * Process a game tick manually (preserves nextTickTime)
- * Advances time but keeps the scheduled automatic tick time unchanged
- * Used for admin manual advancement
- */
-export function processGameTickManual(): void {
-  if (gameState.isProcessing) {
-    return; // Prevent concurrent ticks
-  }
-  
-  gameState.isProcessing = true;
-  
-  try {
-    const newTime = advanceGameTime(false); // Don't update nextTickTime for manual ticks
-    setGameState({
-      ...gameState,
-      time: newTime,
-      isProcessing: false,
-    });
-    
-    // Send notification about manual time advancement
-    if (currentCompanyForNotifications) {
-      notificationService.addMessage(
-        `🎮 Admin manually advanced time to Day ${newTime.day}, Month ${newTime.month}, ${newTime.year}`,
-        'admin_manual_advance',
-        'Admin Control',
-        'time',
-        currentCompanyForNotifications
-      );
-    }
-  } catch (error) {
-    console.error('Error processing manual game tick:', error);
-    gameState.isProcessing = false;
-  }
+export async function processGameTick(): Promise<void> {
+  return processTickInternal(false);
 }
 
-/**
- * Set processing state (for external control)
- */
+export async function processGameTickManual(): Promise<void> {
+  return processTickInternal(true);
+}
+
 export function setProcessingState(isProcessing: boolean): void {
-  setGameState({
-    ...gameState,
-    isProcessing,
-  });
+  setGameState({ ...gameState, isProcessing });
+}
+
+export function cleanupGameState(): void {
+  if (gameTimeSubscription) {
+    supabase.removeChannel(gameTimeSubscription);
+    gameTimeSubscription = null;
+  }
+  stateListeners = [];
 }
 

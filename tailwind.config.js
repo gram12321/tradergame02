@@ -51,6 +51,10 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        wine: {
+          DEFAULT: "#8B2E3E",
+          dark: "#6B1F2E",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

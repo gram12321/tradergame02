@@ -6,11 +6,11 @@ export interface PageProps {
 }
 
 export interface NavigationProps {
-  // Props for navigation components
+  onNavigate?: (page: string) => void;
 }
 
 export interface CompanyProps {
-  // Props related to company data
+  currentCompany?: any;
 }
 
 export interface DialogProps {

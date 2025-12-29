@@ -23,35 +23,6 @@ export interface City {
 }
 
 // ============================================================================
-// RECIPE SYSTEM
-// ============================================================================
-
-
-/**
- * Recipe ID type
- */
-export type RecipeId = 'produce_grain' | 'mill_grain' | 'bake_bread';
-
-/**
- * Recipe definition for facility production
- * Recipes can be shared across multiple facility types
- */
-export interface Recipe {
-  id: RecipeId;
-  name: string;
-
- 
-  // Processing
-  processingTicks: number; // Number of game ticks to complete (default: 1)
-  
-  // Compatibility
-  facilityTypes: ProductionFacilityType[]; // Facility types that can use this recipe
-  
-}
-
-
-
-// ============================================================================
 // FACILITY SYSTEM
 // ============================================================================
 
@@ -119,32 +90,25 @@ export interface Facility {
 // ============================================================================
 
 /**
- * In-game date structure
- */
-export interface GameDate {
-  day: number; // Day of month (1-24)
-  month: number; // Month of year (1-7)
-  year: number; // Year number
-}
-
-/**
  * Game time structure
  * Tracks game progression (hourly real-time or manual advancement)
+ * Combines date and tick information
  */
 export interface GameTime {
   tick: number; // Current game tick counter
-  date: GameDate; // In-game date
+  day: number; // Day of month (1-24)
+  month: number; // Month of year (1-7)
+  year: number; // Year number
   lastTickTime: string; // ISO timestamp of last real-time tick (for automatic advancement)
   nextTickTime: string; // ISO timestamp of next scheduled real-time tick
 }
 
 /**
  * Game state structure
- * Central game state management
+ * Central game state management (separate from time tracking)
  */
 export interface GameState {
   time: GameTime;
-  currentTick: number; // Current processing tick
   isProcessing: boolean; // Whether tick is currently being processed
 }
 
@@ -167,3 +131,44 @@ export interface Resource {
   quality?: number; // Quality value (1->inf scale, higher is better)
 
 }
+// ============================================================================
+// RECIPE SYSTEM
+// ============================================================================
+
+
+/**
+ * Recipe ID type
+ */
+export type RecipeId = 'produce_grain' | 'mill_grain' | 'bake_bread';
+
+/**
+ * Recipe definition for facility production
+ * Recipes can be shared across multiple facility types
+ */
+export interface Recipe {
+  id: RecipeId;
+  name: string;
+
+ 
+  // Processing
+  processingTicks: number; // Number of game ticks to complete (default: 1)
+  
+  // Compatibility
+  facilityTypes: ProductionFacilityType[]; // Facility types that can use this recipe
+  
+}
+
+// ============================================================================
+// NOTIFICATION SYSTEM
+// ============================================================================
+
+/**
+ * Notification category types
+ * Used for categorizing and filtering notifications
+ */
+export type NotificationCategory = 
+  | 'system'
+  | 'finance'
+  | 'time'
+  | 'production'
+  | 'sales'

@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   getGameState,
-  processGameTickWithFacilities,
+  processGameTick,
+  processGameTickManual,
 } from '@/lib/services/core';
 import type { Facility } from '@/lib/types/types';
 
 interface UseGameTickOptions {
   facilities: Facility[];
   onFacilitiesUpdate?: (facilities: Facility[]) => void;
-  autoAdvanceEnabled?: boolean; // Whether to auto-advance every 60 minutes
+  autoAdvanceEnabled?: boolean; // Whether to auto-advance every 3600 seconds (1 hour)
 }
 
 export function useGameTick({
@@ -20,22 +21,24 @@ export function useGameTick({
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleAdvanceTick = useCallback(() => {
-    if (isProcessing || facilities.length === 0) return;
+    if (isProcessing || gameState.isProcessing) return;
 
     setIsProcessing(true);
     try {
-      const result = processGameTickWithFacilities(facilities);
+      // Use manual tick to preserve the scheduled automatic tick time
+      processGameTickManual();
       setGameState(getGameState());
-
-      if (result.result.success && onFacilitiesUpdate) {
-        onFacilitiesUpdate(result.updatedFacilities);
+      
+      // TODO: Process facilities here when facility system is implemented
+      if (onFacilitiesUpdate) {
+        onFacilitiesUpdate(facilities);
       }
     } catch (error) {
       console.error('Error advancing game tick:', error);
     } finally {
       setIsProcessing(false);
     }
-  }, [facilities, isProcessing, onFacilitiesUpdate]);
+  }, [facilities, isProcessing, gameState.isProcessing, onFacilitiesUpdate]);
 
   // Update game state periodically and check for automatic advancement
   useEffect(() => {
@@ -52,13 +55,13 @@ export function useGameTick({
       const now = new Date();
       const nextTick = new Date(state.time.nextTickTime);
 
-      // If it's time for automatic advancement (60 minutes passed)
-      if (now >= nextTick && !state.isProcessing && facilities.length > 0) {
+      // If it's time for automatic advancement (3600 seconds passed)
+      if (now >= nextTick && !state.isProcessing) {
         handleAdvanceTick();
       }
     };
 
-    // Update UI every second
+    // Update UI every second and check for auto-advance
     const updateInterval = setInterval(() => {
       setGameState(getGameState());
       checkAutoAdvance();
@@ -73,4 +76,3 @@ export function useGameTick({
     handleAdvanceTick,
   };
 }
-

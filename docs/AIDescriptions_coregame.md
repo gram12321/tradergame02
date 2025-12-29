@@ -1,7 +1,7 @@
 # TraderGame Framework - Core Architecture
 
 ## 🎯 Overview
-
+This is a clean start on a project called tradergame02. Its a multiplayer tradergame, with production chains and eventually retail of the produced company, simulating a supply/demand side of a economy
 
 
 ## 🏗️ Core Systems

@@ -1,3 +1,4 @@
 // Barrel export for constants
-// Add constants here as they are created
+// Navigation emojis are exported from @/lib/utils/icons
+export * from './constants';
 

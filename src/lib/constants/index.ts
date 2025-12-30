@@ -4,4 +4,5 @@ export * from './constants';
 export * from './cities';
 export * from './resources';
 export * from './recipes';
+export * from './facilities';
 

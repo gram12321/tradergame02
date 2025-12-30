@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import type { RecipeId } from '@/lib/types/types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, Button, Badge, Input } from '@/components/ui';
+import type { RecipeId, Facility } from '@/lib/types/types';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, Button, Badge, Input, UnifiedTooltip } from '@/components/ui';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/shadCN/table';
 import { updateFacility } from '@/lib/database';
-import { getRecipe, getResourceName } from '@/lib/constants';
+import { getRecipe, getResourceName, getResourceIcon } from '@/lib/constants';
 import { startProduction, stopProduction } from '@/lib/services';
-import { Building2, Factory, Warehouse, Store, ArrowLeft, Play, Square, Pencil, Check, X } from 'lucide-react';
+import { getTailwindClasses } from '@/lib/utils/colorMapping';
+import { Building2, Factory, Warehouse, Store, ArrowLeft, Square, Pencil, Check, X } from 'lucide-react';
 import { toast } from '@/lib/utils';
 import { useLoadingState, useFacility } from '@/hooks';
 
@@ -18,6 +19,7 @@ interface FacilityDetailProps {
 export function FacilityDetail({ facilityId, currentCompany: _currentCompany, onBack }: FacilityDetailProps) {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
+  const [selectedRecipeId, setSelectedRecipeId] = useState<RecipeId | ''>('');
   const inputRef = useRef<HTMLInputElement>(null);
   const { isLoading: isStarting, withLoading: withStartingLoading } = useLoadingState();
   const { isLoading: isStopping, withLoading: withStoppingLoading } = useLoadingState();
@@ -26,6 +28,47 @@ export function FacilityDetail({ facilityId, currentCompany: _currentCompany, on
   
   // Use centralized game data hook for realtime facility updates
   const { facility, isLoading } = useFacility(facilityId);
+
+  // Check if facility has required inputs for a recipe
+  const checkRecipeAvailability = (facility: Facility, recipeId: RecipeId): { available: boolean; missingResources: Array<{ resourceId: string; required: number; available: number }> } => {
+    const recipe = getRecipe(recipeId);
+    if (!recipe) {
+      return { available: false, missingResources: [] };
+    }
+
+    if (recipe.inputs.length === 0) {
+      return { available: true, missingResources: [] };
+    }
+
+    const missingResources: Array<{ resourceId: string; required: number; available: number }> = [];
+
+    for (const input of recipe.inputs) {
+      const inventoryItem = facility.inventory.items.find(
+        item => item.resourceId === input.resourceId
+      );
+      const available = inventoryItem?.quantity || 0;
+      
+      if (available < input.quantity) {
+        missingResources.push({
+          resourceId: input.resourceId,
+          required: input.quantity,
+          available: available,
+        });
+      }
+    }
+
+    return {
+      available: missingResources.length === 0,
+      missingResources,
+    };
+  };
+
+  // Set default selected recipe when facility loads
+  useEffect(() => {
+    if (facility && facility.availableRecipeIds.length > 0 && !selectedRecipeId) {
+      setSelectedRecipeId(facility.availableRecipeIds[0]);
+    }
+  }, [facility, selectedRecipeId]);
 
   const handleStartProduction = async (recipeId: RecipeId) => {
     if (!facility) return;
@@ -291,13 +334,17 @@ export function FacilityDetail({ facilityId, currentCompany: _currentCompany, on
             <CardContent>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Type</p>
-                  <Badge variant="outline">{facility.type}</Badge>
+                  <p className="text-sm text-muted-foreground mb-1">Facility Type</p>
+                  <Badge variant="outline">
+                    {facility.type.charAt(0).toUpperCase() + facility.type.slice(1)}
+                  </Badge>
                 </div>
                 {facility.facilitySubtype && (
                   <div>
-                    <p className="text-sm text-muted-foreground mb-1">Subtype</p>
-                    <p className="font-semibold">{facility.facilitySubtype}</p>
+                    <p className="text-sm text-muted-foreground mb-1">Production Type</p>
+                    <p className="font-semibold">
+                      {facility.facilitySubtype.charAt(0).toUpperCase() + facility.facilitySubtype.slice(1)}
+                    </p>
                   </div>
                 )}
                 <div>
@@ -449,92 +496,206 @@ export function FacilityDetail({ facilityId, currentCompany: _currentCompany, on
             <CardHeader>
               <CardTitle>Available Recipes</CardTitle>
               <CardDescription>
-                Recipes this facility can execute
+                Select a recipe to start production
               </CardDescription>
             </CardHeader>
             <CardContent>
               {facility.availableRecipeIds.length === 0 ? (
                 <p className="text-muted-foreground italic py-4 text-center">No recipes available</p>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-2">
+                  {/* No Recipe Active Card */}
+                  {!facility.activeRecipeId && (
+                    (() => {
+                      const redScheme = getTailwindClasses('red');
+                      return (
+                        <div
+                          className={`w-full p-3 border rounded-md transition-all ${redScheme.background} ${redScheme.border}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className={`font-medium ${redScheme.text}`}>
+                              ⚠️ No Recipe Active
+                            </span>
+                            <Badge className={`text-xs ${redScheme.badge}`}>
+                              Waiting
+                            </Badge>
+                          </div>
+                          <p className={`text-xs mt-2 ${redScheme.text} opacity-80`}>
+                            No production is currently running. Select a recipe below to start production.
+                          </p>
+                        </div>
+                      );
+                    })()
+                  )}
+                  
                   {facility.availableRecipeIds.map((recipeId) => {
                     try {
                       const recipe = getRecipe(recipeId);
                       const isActive = facility.activeRecipeId === recipeId;
+                      const isSelected = selectedRecipeId === recipeId;
                       const canStart = !facility.activeRecipeId; // Can start if no active production
                       
-                      return (
-                        <Card 
-                          key={recipeId} 
-                          className={`border-l-4 ${isActive ? 'border-l-green-500' : 'border-l-primary'}`}
+                      // Check if recipe is available (has required inputs)
+                      const recipeAvailability = checkRecipeAvailability(facility, recipeId);
+                      const isRecipeAvailable = recipeAvailability.available;
+                      
+                      // Get color scheme based on state
+                      const greenScheme = getTailwindClasses('green');
+                      const blueScheme = getTailwindClasses('blue');
+                      const redScheme = getTailwindClasses('red');
+                      
+                      // Format inputs with icons
+                      const formatInputs = () => {
+                        if (recipe.inputs.length === 0) return <span className="text-muted-foreground italic">No inputs required</span>;
+                        return (
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {recipe.inputs.map((input, idx) => (
+                              <span key={idx} className="inline-flex items-center gap-1">
+                                <span>{getResourceIcon(input.resourceId)}</span>
+                                <span>{getResourceName(input.resourceId)}</span>
+                                <span className="font-semibold">× {input.quantity}</span>
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      };
+                      
+                      // Format outputs with icons
+                      const formatOutputs = () => {
+                        if (recipe.outputs.length === 0) return <span className="text-muted-foreground italic">No outputs</span>;
+                        return (
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {recipe.outputs.map((output, idx) => (
+                              <span key={idx} className="inline-flex items-center gap-1 text-green-700 font-medium">
+                                <span>{getResourceIcon(output.resourceId)}</span>
+                                <span>{getResourceName(output.resourceId)}</span>
+                                <span className="font-semibold">× {output.quantity}</span>
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      };
+                      
+                      // Determine classes based on state
+                      const getButtonClasses = () => {
+                        if (!isRecipeAvailable) {
+                          return `w-full justify-start h-auto flex flex-col items-start p-3 transition-all ${redScheme.background} ${redScheme.border} opacity-60 cursor-not-allowed`;
+                        }
+                        if (isActive) {
+                          return `w-full justify-start h-auto flex flex-col items-start p-3 transition-all ${greenScheme.background} ${greenScheme.border} hover:bg-green-100`;
+                        }
+                        if (isSelected) {
+                          return `w-full justify-start h-auto flex flex-col items-start p-3 transition-all ${blueScheme.background} border-blue-300 hover:bg-blue-100`;
+                        }
+                        return `w-full justify-start h-auto flex flex-col items-start p-3 transition-all ${blueScheme.background} hover:bg-blue-100 ${blueScheme.border}`;
+                      };
+                      
+                      const textColor = !isRecipeAvailable 
+                        ? redScheme.text 
+                        : isActive 
+                        ? greenScheme.text 
+                        : blueScheme.text;
+                      const borderColor = !isRecipeAvailable 
+                        ? redScheme.border 
+                        : isActive 
+                        ? greenScheme.border 
+                        : blueScheme.border;
+                      const badgeClasses = !isRecipeAvailable 
+                        ? redScheme.badge 
+                        : isActive 
+                        ? greenScheme.badge 
+                        : blueScheme.badge;
+                      
+                      // Create tooltip content for unavailable recipes
+                      const tooltipContent = !isRecipeAvailable ? (
+                        <div className="space-y-2">
+                          <p className="font-semibold">Recipe Unavailable</p>
+                          <p className="text-sm">Missing input resources:</p>
+                          <ul className="text-sm space-y-1 list-disc list-inside">
+                            {recipeAvailability.missingResources.map((missing, idx) => (
+                              <li key={idx}>
+                                {getResourceIcon(missing.resourceId)} {getResourceName(missing.resourceId)}: 
+                                <span className="font-semibold"> {missing.available}/{missing.required}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null;
+                      
+                      const buttonElement = (
+                        <Button
+                          key={recipeId}
+                          onClick={() => {
+                            setSelectedRecipeId(recipeId);
+                            if (canStart && !isActive && isRecipeAvailable) {
+                              handleStartProduction(recipeId);
+                            }
+                          }}
+                          disabled={isStarting || (isActive && !canStart) || !isRecipeAvailable}
+                          variant="outline"
+                          className={getButtonClasses()}
                         >
-                          <CardContent className="pt-4">
-                            <div className="flex items-center justify-between mb-3">
-                              <div>
-                                <h4 className="font-semibold">{recipe.name}</h4>
-                                <p className="text-sm text-muted-foreground">
-                                  Processing time: {recipe.processingTicks} tick(s)
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {isActive && <Badge variant="default">Active</Badge>}
-                                <Badge variant="secondary">{recipeId}</Badge>
-                              </div>
+                          <div className="flex justify-between items-center w-full mb-2">
+                            <span className={`font-medium ${textColor}`}>
+                              {recipe.name}
+                              {isActive && ' (Current)'}
+                            </span>
+                            <Badge variant="secondary" className="text-xs">
+                              {recipe.processingTicks} {recipe.processingTicks === 1 ? 'tick' : 'ticks'}
+                            </Badge>
+                          </div>
+                          
+                          <div className="text-xs w-full space-y-2">
+                            <div className="flex items-start gap-2">
+                              <span className={`font-medium ${textColor} whitespace-nowrap`}>Inputs:</span>
+                              <div className="flex-1">{formatInputs()}</div>
                             </div>
-                            <div className="grid grid-cols-2 gap-4 pt-3 border-t">
-                              <div>
-                                <p className="text-sm text-muted-foreground mb-1">Inputs</p>
-                                {recipe.inputs.length === 0 ? (
-                                  <p className="text-sm italic text-muted-foreground">None</p>
-                                ) : (
-                                  <ul className="text-sm space-y-1">
-                                    {recipe.inputs.map((input, idx) => (
-                                      <li key={idx}>
-                                        {getResourceName(input.resourceId)} × {input.quantity}
-                                      </li>
-                                    ))}
-                                  </ul>
-                                )}
-                              </div>
-                              <div>
-                                <p className="text-sm text-muted-foreground mb-1">Outputs</p>
-                                {recipe.outputs.length === 0 ? (
-                                  <p className="text-sm italic text-muted-foreground">None</p>
-                                ) : (
-                                  <ul className="text-sm space-y-1">
-                                    {recipe.outputs.map((output, idx) => (
-                                      <li key={idx}>
-                                        {getResourceName(output.resourceId)} × {output.quantity}
-                                      </li>
-                                    ))}
-                                  </ul>
-                                )}
-                              </div>
+                            <div className="flex items-start gap-2">
+                              <span className={`font-medium ${textColor} whitespace-nowrap`}>Outputs:</span>
+                              <div className="flex-1">{formatOutputs()}</div>
                             </div>
-                            {!isActive && (
-                              <div className="mt-4 pt-3 border-t">
-                                <Button
-                                  variant="default"
-                                  size="sm"
-                                  onClick={() => handleStartProduction(recipeId)}
-                                  disabled={!canStart || isStarting}
-                                  className="w-full"
-                                >
-                                  <Play className="h-4 w-4 mr-2" />
-                                  Start Production
-                                </Button>
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
+                          </div>
+                          
+                          {isActive && (
+                            <div className={`mt-2 pt-2 border-t ${borderColor} w-full`}>
+                              <Badge className={`text-xs ${badgeClasses}`}>
+                                Production Active
+                              </Badge>
+                            </div>
+                          )}
+                          {!isRecipeAvailable && !isActive && (
+                            <div className={`mt-2 pt-2 border-t ${borderColor} w-full`}>
+                              <Badge className={`text-xs ${badgeClasses}`}>
+                                Unavailable
+                              </Badge>
+                            </div>
+                          )}
+                        </Button>
                       );
+                      
+                      // Wrap in tooltip if unavailable
+                      if (!isRecipeAvailable && tooltipContent) {
+                        return (
+                          <UnifiedTooltip
+                            key={recipeId}
+                            content={tooltipContent}
+                            title="Recipe Unavailable"
+                            side="top"
+                          >
+                            <div>{buttonElement}</div>
+                          </UnifiedTooltip>
+                        );
+                      }
+                      
+                      return buttonElement;
                     } catch (error) {
                       return (
-                        <Card key={recipeId} className="border-l-4 border-l-muted">
-                          <CardContent className="pt-4">
-                            <p className="text-sm text-muted-foreground">Recipe not found: {recipeId}</p>
-                          </CardContent>
-                        </Card>
+                        <div
+                          key={recipeId}
+                          className="w-full p-3 border rounded-md bg-muted text-muted-foreground text-sm"
+                        >
+                          Recipe not found: {recipeId}
+                        </div>
                       );
                     }
                   })}

@@ -25,7 +25,7 @@ dist-ssr
 .cursor/
 
 # Old iterations directory
-docs/old_iterations/
+docs/lecacy_iteration/
 migrations/
 
 # Environment variables

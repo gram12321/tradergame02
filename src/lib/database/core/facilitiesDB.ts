@@ -162,9 +162,9 @@ export async function getFacilityById(facilityId: string): Promise<Facility | nu
 }
 
 /**
- * Create a new facility
+ * Create a new facility (database layer)
  */
-export async function createFacility(facility: Omit<Facility, 'id' | 'created_at' | 'updated_at'>): Promise<Facility> {
+export async function createFacilityDB(facility: Omit<Facility, 'id' | 'created_at' | 'updated_at'>): Promise<Facility> {
   try {
     const dbRecord = facilityToDbRecord(facility);
     

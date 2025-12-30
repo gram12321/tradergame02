@@ -31,10 +31,26 @@ export function getResource(resourceId: ResourceId): Resource | undefined {
 }
 
 /**
+ * Resource icon/emoji mapping
+ */
+export const RESOURCE_ICONS: Record<ResourceId, string> = {
+  grain: '🌾',
+  flour: '🧾',
+  bread: '🍞',
+};
+
+/**
  * Get resource name by ID
  */
 export function getResourceName(resourceId: ResourceId | string): string {
   const resource = RESOURCES_DATA[resourceId as ResourceId];
   return resource?.name || resourceId;
+}
+
+/**
+ * Get resource icon/emoji by ID
+ */
+export function getResourceIcon(resourceId: ResourceId | string): string {
+  return RESOURCE_ICONS[resourceId as ResourceId] || '📦';
 }
 

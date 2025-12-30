@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, Button, Badge, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Label } from '@/components/ui';
 import { DEFAULT_CITIES, getResourceName } from '@/lib/constants';
-import { createFarm } from '@/lib/services';
+import { createFarm, createMill, createBakery } from '@/lib/services';
 import { Building2, Factory, Warehouse, Store, Plus } from 'lucide-react';
 import { toast } from '@/lib/utils';
 import { useLoadingState, useFacilities } from '@/hooks';
+import type { ProductionFacilityType } from '@/lib/types/types';
 
 interface FacilitiesProps {
   currentCompany?: { id: string; name: string } | null;
@@ -15,6 +16,7 @@ interface FacilitiesProps {
 export function Facilities({ currentCompany, onFacilitySelect, onBack }: FacilitiesProps) {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedCityId, setSelectedCityId] = useState<string>(DEFAULT_CITIES[0].id);
+  const [selectedFacilityType, setSelectedFacilityType] = useState<ProductionFacilityType>('farm');
   const { isLoading: isCreating, withLoading } = useLoadingState();
   
   // Use centralized game data hook for realtime facility updates
@@ -32,18 +34,49 @@ export function Facilities({ currentCompany, onFacilitySelect, onBack }: Facilit
 
     await withLoading(async () => {
       try {
-        const newFacility = await createFarm(
-          currentCompany.id,
-          currentCompany.name,
-          selectedCityId
-        );
+        let newFacility;
+        let facilityTypeName: string;
+        let successMessage: string;
+
+        switch (selectedFacilityType) {
+          case 'farm':
+            newFacility = await createFarm(
+              currentCompany.id,
+              currentCompany.name,
+              selectedCityId
+            );
+            facilityTypeName = 'Farm';
+            successMessage = `Farm "${newFacility.name}" created successfully! Production started automatically.`;
+            break;
+          case 'mill':
+            newFacility = await createMill(
+              currentCompany.id,
+              currentCompany.name,
+              selectedCityId
+            );
+            facilityTypeName = 'Mill';
+            successMessage = `Mill "${newFacility.name}" created successfully! Add grain to start production.`;
+            break;
+          case 'bakery':
+            newFacility = await createBakery(
+              currentCompany.id,
+              currentCompany.name,
+              selectedCityId
+            );
+            facilityTypeName = 'Bakery';
+            successMessage = `Bakery "${newFacility.name}" created successfully! Add flour to start production.`;
+            break;
+          default:
+            throw new Error('Invalid facility type');
+        }
 
         toast({
           title: 'Success',
-          description: `Farm "${newFacility.name}" created successfully! Production started automatically.`,
+          description: successMessage,
         });
         setIsCreateDialogOpen(false);
         setSelectedCityId(DEFAULT_CITIES[0].id);
+        setSelectedFacilityType('farm');
         refetch();
       } catch (error: any) {
         console.error('Error creating facility:', error);
@@ -216,7 +249,7 @@ export function Facilities({ currentCompany, onFacilitySelect, onBack }: Facilit
           <DialogHeader>
             <DialogTitle>Create New Facility</DialogTitle>
             <DialogDescription>
-              Build a new production facility. Currently, only farms are available.
+              Build a new production facility. Select the type of facility you want to create.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -236,14 +269,39 @@ export function Facilities({ currentCompany, onFacilitySelect, onBack }: Facilit
                 ))}
               </select>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="facility-type">Facility Type</Label>
+              <select
+                id="facility-type"
+                value={selectedFacilityType}
+                onChange={(e) => setSelectedFacilityType(e.target.value as ProductionFacilityType)}
+                disabled={isCreating}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="farm">Farm</option>
+                <option value="mill">Mill</option>
+                <option value="bakery">Bakery</option>
+              </select>
+            </div>
             <div className="rounded-lg bg-muted p-3 space-y-2">
-              <p className="text-sm font-medium">Facility Type</p>
+              <p className="text-sm font-medium">Facility Details</p>
               <div className="flex items-center gap-2">
                 <Badge variant="secondary">Production</Badge>
-                <Badge variant="outline">Farm</Badge>
+                <Badge variant="outline">
+                  {selectedFacilityType.charAt(0).toUpperCase() + selectedFacilityType.slice(1)}
+                </Badge>
               </div>
               <p className="text-xs text-muted-foreground">
-                Farms can produce grain using the "Grow Grain" recipe. The facility will be automatically named.
+                {selectedFacilityType === 'farm' && (
+                  <>Farms can produce grain using the "Grow Grain" recipe. Production starts automatically.</>
+                )}
+                {selectedFacilityType === 'mill' && (
+                  <>Mills can convert grain into flour using the "Mill Grain" recipe. Requires grain input to start production.</>
+                )}
+                {selectedFacilityType === 'bakery' && (
+                  <>Bakeries can convert flour into bread using the "Bake Bread" recipe. Requires flour input to start production.</>
+                )}
+                {' '}The facility will be automatically named.
               </p>
             </div>
             <div className="flex justify-end gap-2 pt-2">
@@ -251,6 +309,7 @@ export function Facilities({ currentCompany, onFacilitySelect, onBack }: Facilit
                 variant="outline"
                 onClick={() => {
                   setIsCreateDialogOpen(false);
+                  setSelectedFacilityType('farm');
                 }}
                 disabled={isCreating}
               >
@@ -260,7 +319,7 @@ export function Facilities({ currentCompany, onFacilitySelect, onBack }: Facilit
                 onClick={handleCreateFacility}
                 disabled={isCreating}
               >
-                {isCreating ? 'Creating...' : 'Create Farm'}
+                {isCreating ? 'Creating...' : `Create ${selectedFacilityType.charAt(0).toUpperCase() + selectedFacilityType.slice(1)}`}
               </Button>
             </div>
           </div>

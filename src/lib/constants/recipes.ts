@@ -20,16 +20,36 @@ export const RECIPES: Record<RecipeId, Recipe> = {
   mill_grain: {
     id: 'mill_grain',
     name: 'Mill Grain',
-    inputs: [],
-    outputs: [],
+    inputs: [
+      {
+        resourceId: 'grain',
+        quantity: 1,
+      },
+    ],
+    outputs: [
+      {
+        resourceId: 'flour',
+        quantity: 1,
+      },
+    ],
     processingTicks: 1,
     facilityTypes: ['mill'],
   },
   bake_bread: {
     id: 'bake_bread',
     name: 'Bake Bread',
-    inputs: [],
-    outputs: [],
+    inputs: [
+      {
+        resourceId: 'flour',
+        quantity: 1,
+      },
+    ],
+    outputs: [
+      {
+        resourceId: 'bread',
+        quantity: 1,
+      },
+    ],
     processingTicks: 1,
     facilityTypes: ['bakery'],
   },

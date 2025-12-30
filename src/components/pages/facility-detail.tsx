@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import type { RecipeId, Facility } from '@/lib/types/types';
+import type { RecipeId } from '@/lib/types/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, Button, Badge, Input, UnifiedTooltip } from '@/components/ui';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/shadCN/table';
 import { updateFacility } from '@/lib/database';
 import { getRecipe, getResourceName, getResourceIcon } from '@/lib/constants';
-import { startProduction, stopProduction } from '@/lib/services';
+import { startProduction, stopProduction, checkRecipeAvailability } from '@/lib/services';
+import { getGameState } from '@/lib/services/core';
 import { getTailwindClasses } from '@/lib/utils/colorMapping';
 import { Building2, Factory, Warehouse, Store, ArrowLeft, Square, Pencil, Check, X } from 'lucide-react';
 import { toast } from '@/lib/utils';
@@ -28,40 +29,6 @@ export function FacilityDetail({ facilityId, currentCompany: _currentCompany, on
   
   // Use centralized game data hook for realtime facility updates
   const { facility, isLoading } = useFacility(facilityId);
-
-  // Check if facility has required inputs for a recipe
-  const checkRecipeAvailability = (facility: Facility, recipeId: RecipeId): { available: boolean; missingResources: Array<{ resourceId: string; required: number; available: number }> } => {
-    const recipe = getRecipe(recipeId);
-    if (!recipe) {
-      return { available: false, missingResources: [] };
-    }
-
-    if (recipe.inputs.length === 0) {
-      return { available: true, missingResources: [] };
-    }
-
-    const missingResources: Array<{ resourceId: string; required: number; available: number }> = [];
-
-    for (const input of recipe.inputs) {
-      const inventoryItem = facility.inventory.items.find(
-        item => item.resourceId === input.resourceId
-      );
-      const available = inventoryItem?.quantity || 0;
-      
-      if (available < input.quantity) {
-        missingResources.push({
-          resourceId: input.resourceId,
-          required: input.quantity,
-          available: available,
-        });
-      }
-    }
-
-    return {
-      available: missingResources.length === 0,
-      missingResources,
-    };
-  };
 
   // Set default selected recipe when facility loads
   useEffect(() => {
@@ -420,13 +387,36 @@ export function FacilityDetail({ facilityId, currentCompany: _currentCompany, on
             const totalTicks = activeRecipe.processingTicks;
             const progressPercent = totalTicks > 0 ? (progressTicks / totalTicks) * 100 : 0;
             
+            // Get current game tick to calculate started tick and completion tick
+            const gameState = getGameState();
+            const currentTick = gameState.time.tick;
+            const startedTick = currentTick - progressTicks;
+            const completionTick = startedTick + totalTicks;
+            
+            // Get main output resource for display
+            const mainOutput = activeRecipe.outputs[0];
+            const outputIcon = mainOutput ? getResourceIcon(mainOutput.resourceId) : '';
+            const outputName = mainOutput ? getResourceName(mainOutput.resourceId) : '';
+            const outputAmount = mainOutput?.quantity || 0;
+            
             return (
               <Card className="border-l-4 border-l-green-500">
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle>Active Production</CardTitle>
-                      <CardDescription>Currently producing: {activeRecipe.name}</CardDescription>
+                    <div className="flex items-center gap-3">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          Producing: {outputIcon} {outputName}
+                        </CardTitle>
+                        <CardDescription>Currently producing: {activeRecipe.name}</CardDescription>
+                      </div>
+                      <Badge 
+                        variant="outline" 
+                        className="text-xs bg-green-100 text-green-800 border-green-200 relative"
+                      >
+                        <div className="absolute inset-0 bg-green-300 opacity-50 animate-[ping_2s_ease-in-out_infinite] rounded-md" />
+                        <span className="relative z-10">Producing</span>
+                      </Badge>
                     </div>
                     <Button
                       variant="outline"
@@ -455,6 +445,18 @@ export function FacilityDetail({ facilityId, currentCompany: _currentCompany, on
                         />
                       </div>
                     </div>
+                    
+                    {/* Production Status Information */}
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t">
+                      <span>Started at tick #{startedTick}</span>
+                      <span className="mx-1">•</span>
+                      <span>Will produce</span>
+                      <span className="font-medium text-green-700">
+                        {outputAmount} {outputIcon} {outputName}
+                      </span>
+                      <span>@Tick #{completionTick}</span>
+                    </div>
+                    
                     <div className="grid grid-cols-2 gap-4 pt-2 border-t">
                       <div>
                         <p className="text-sm text-muted-foreground mb-1">Inputs</p>
@@ -463,8 +465,9 @@ export function FacilityDetail({ facilityId, currentCompany: _currentCompany, on
                         ) : (
                           <ul className="text-sm space-y-1">
                             {activeRecipe.inputs.map((input, idx) => (
-                              <li key={idx}>
-                                {getResourceName(input.resourceId)} × {input.quantity}
+                              <li key={idx} className="flex items-center gap-1">
+                                <span>{getResourceIcon(input.resourceId)}</span>
+                                <span>{getResourceName(input.resourceId)} × {input.quantity}</span>
                               </li>
                             ))}
                           </ul>
@@ -477,8 +480,9 @@ export function FacilityDetail({ facilityId, currentCompany: _currentCompany, on
                         ) : (
                           <ul className="text-sm space-y-1">
                             {activeRecipe.outputs.map((output, idx) => (
-                              <li key={idx}>
-                                {getResourceName(output.resourceId)} × {output.quantity}
+                              <li key={idx} className="flex items-center gap-1">
+                                <span>{getResourceIcon(output.resourceId)}</span>
+                                <span>{getResourceName(output.resourceId)} × {output.quantity}</span>
                               </li>
                             ))}
                           </ul>

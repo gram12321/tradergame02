@@ -81,7 +81,8 @@ export const AVATAR_OPTIONS = [
 
 export const NAVIGATION_EMOJIS = {
   dashboard: '🏠',
-  finance: '💰'
+  finance: '💰',
+  facilities: '🏭'
 } as const;
 
 export const STATUS_EMOJIS = {

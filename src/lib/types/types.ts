@@ -78,6 +78,10 @@ export interface Facility {
   
   // Recipe system
   availableRecipeIds: RecipeId[]; // Recipes this facility can use
+  
+  // Active production
+  activeRecipeId?: RecipeId; // Currently processing recipe (undefined if idle)
+  progressTicks?: number; // Number of ticks completed for current production (0 to processingTicks)
 
   
   // Financial
@@ -139,7 +143,15 @@ export interface Resource {
 /**
  * Recipe ID type
  */
-export type RecipeId = 'produce_grain' | 'mill_grain' | 'bake_bread';
+export type RecipeId = 'grow_grain' | 'mill_grain' | 'bake_bread';
+
+/**
+ * Recipe input/output item
+ */
+export interface RecipeItem {
+  resourceId: ResourceId;
+  quantity: number;
+}
 
 /**
  * Recipe definition for facility production
@@ -148,8 +160,11 @@ export type RecipeId = 'produce_grain' | 'mill_grain' | 'bake_bread';
 export interface Recipe {
   id: RecipeId;
   name: string;
-
- 
+  
+  // Input/Output
+  inputs: RecipeItem[]; // Required input resources (empty array if no inputs)
+  outputs: RecipeItem[]; // Output resources produced
+  
   // Processing
   processingTicks: number; // Number of game ticks to complete (default: 1)
   

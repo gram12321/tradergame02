@@ -13,3 +13,15 @@ export {
 export { getTimeUntilNextTick } from './gametick';
 
 export { notificationService, type PlayerNotification } from './notificationService';
+
+export {
+  initializeGameData,
+  subscribeFacilities,
+  subscribeFacility,
+  getFacilities,
+  getFacility,
+  refreshFacilities,
+  refreshAllActiveFacilities,
+  cleanupGameData,
+  getCurrentCompanyId,
+} from './gameData';

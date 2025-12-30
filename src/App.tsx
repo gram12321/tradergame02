@@ -8,6 +8,8 @@ import { Settings } from '@/components/pages/settings';
 import { AdminDashboard } from '@/components/pages/adminDashboard';
 import { Achievements } from '@/components/pages/achievements';
 import { Highscores } from '@/components/pages/highscores';
+import { Facilities } from '@/components/pages/facilities';
+import { FacilityDetail } from '@/components/pages/facility-detail';
 import { setCurrentCompanyForNotifications, notificationService, initializeGameState, cleanupGameState } from '@/lib/services/core';
 import type { Facility } from '@/lib/types/types';
 
@@ -26,6 +28,7 @@ function App() {
   const [currentPage, setCurrentPage] = useState('login');
   const [currentCompany, setCurrentCompany] = useState<any>(null);
   const [facilities, setFacilities] = useState<Facility[]>([]);
+  const [selectedFacilityId, setSelectedFacilityId] = useState<string | null>(null);
   const isAdmin = true; // TODO: Get from auth context
 
   const handleCompanySelected = (company: any) => {
@@ -108,6 +111,37 @@ function App() {
           <Highscores 
             currentCompanyName={currentCompany?.name}
             onBack={() => setCurrentPage(currentCompany ? 'company-overview' : 'login')}
+          />
+        );
+      case 'facilities':
+        return (
+          <Facilities
+            currentCompany={currentCompany}
+            onFacilitySelect={(facilityId) => {
+              setSelectedFacilityId(facilityId);
+              setCurrentPage('facility-detail');
+            }}
+            onBack={() => setCurrentPage('company-overview')}
+          />
+        );
+      case 'facility-detail':
+        return selectedFacilityId ? (
+          <FacilityDetail
+            facilityId={selectedFacilityId}
+            currentCompany={currentCompany}
+            onBack={() => {
+              setSelectedFacilityId(null);
+              setCurrentPage('facilities');
+            }}
+          />
+        ) : (
+          <Facilities
+            currentCompany={currentCompany}
+            onFacilitySelect={(facilityId) => {
+              setSelectedFacilityId(facilityId);
+              setCurrentPage('facility-detail');
+            }}
+            onBack={() => setCurrentPage('company-overview')}
           />
         );
       default:

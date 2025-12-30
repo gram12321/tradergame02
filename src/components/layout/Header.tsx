@@ -58,6 +58,7 @@ export function Header({
   const navItems = [
     { id: 'dashboard', label: 'Company', icon: NAVIGATION_EMOJIS.dashboard },
     { id: 'finance', label: 'Finance', icon: NAVIGATION_EMOJIS.finance },
+    { id: 'facilities', label: 'Facilities', icon: NAVIGATION_EMOJIS.facilities },
   ];
 
   return (

@@ -3,6 +3,8 @@ import { DAYS_PER_MONTH, MONTHS_PER_YEAR, GAME_INITIALIZATION } from '@/lib/cons
 import { notificationService } from './notificationService';
 import { saveGameTimeToDB, getGameTimeFromDB } from '@/lib/database/core/gameTimeDB';
 import { supabase } from '@/lib/utils/supabase';
+import { advanceAllFacilitiesProduction } from '@/lib/services/production';
+import { refreshAllActiveFacilities } from './gameData';
 
 export function getNextHourBoundary(): Date {
   const now = new Date();
@@ -69,7 +71,6 @@ export async function initializeGameState(): Promise<void> {
 
       setupGameTimeSubscription();
       isInitialized = true;
-      console.log('Game state initialized:', dbTime ? 'from DB' : 'fallback');
     } catch (error) {
       console.error('Error initializing game state:', error);
       isInitialized = true;
@@ -122,8 +123,6 @@ function setupGameTimeSubscription(): void {
       }
     )
     .subscribe();
-
-  console.log('Game time subscription established');
 }
 
 export function getGameState(): GameState {
@@ -181,6 +180,12 @@ async function processTickInternal(isManual: boolean): Promise<void> {
     if (!saved) {
       console.error('Failed to save game time to database');
     }
+
+    // Advance production for all facilities with active production
+    await advanceAllFacilitiesProduction();
+
+    // Refresh UI data for all active companies
+    await refreshAllActiveFacilities();
 
     setGameState({ ...gameState, time: newTime, isProcessing: false });
     

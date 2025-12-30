@@ -3,5 +3,6 @@
 
 export * from './admin';
 export * from './core';
+export * from './facility';
 export * from './production';
 export * from './user';

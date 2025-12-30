@@ -14,3 +14,4 @@ export { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 export { ScrollArea, ScrollBar } from './shadCN/scroll-area'
 export { Tabs, TabsList, TabsTrigger, TabsContent } from './shadCN/tabs'
 export { Switch } from './shadCN/switch'
+export { Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell, TableCaption } from './shadCN/table'

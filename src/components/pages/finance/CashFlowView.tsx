@@ -1,7 +1,8 @@
+import { useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui';
 import { formatNumber } from '@/lib/utils';
-import { useTransactions } from '@/hooks';
+import { getTransactionsByCompanyId, Transaction } from '@/lib/database';
 
 type FlowType = 'income' | 'expense' | 'capital';
 
@@ -24,7 +25,6 @@ const FLOW_TYPE_META: Record<FlowType, { label: string; textClass: string; badge
 };
 
 function getFlowType(category: string, amount: number): FlowType {
-  // Check if this category is a capital flow (like starting_capital)
   const capitalCategories = ['starting_capital'];
   if (capitalCategories.includes(category)) {
     return 'capital';
@@ -33,7 +33,32 @@ function getFlowType(category: string, amount: number): FlowType {
 }
 
 export function CashFlowView({ companyId }: { companyId: string | null }) {
-  const { transactions, isLoading } = useTransactions(companyId);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    if (!companyId) {
+      setTransactions([]);
+      setIsLoading(false);
+      return;
+    }
+
+    const fetchTransactions = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const data = await getTransactionsByCompanyId(companyId);
+        setTransactions(data);
+      } catch (err) {
+        setError(err instanceof Error ? err : new Error('Failed to fetch transactions'));
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTransactions();
+  }, [companyId]);
 
   if (isLoading) {
     return (
@@ -45,6 +70,22 @@ export function CashFlowView({ companyId }: { companyId: string | null }) {
         <CardContent>
           <div className="text-center py-10 text-gray-500">
             <p>Loading...</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Cash Flow Statement</CardTitle>
+          <CardDescription>Error loading transactions</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-10 text-red-500">
+            <p>{error.message}</p>
           </div>
         </CardContent>
       </Card>

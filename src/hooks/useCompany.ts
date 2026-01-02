@@ -1,36 +1,36 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/utils/supabase';
-import { Transaction, getTransactionsByCompanyId } from '@/lib/database';
+import { Company, getCompanyById } from '@/lib/database';
 
 /**
- * Custom hook to fetch transactions for a company
- * Supports real-time updates
+ * Custom hook to fetch and track a company with real-time updates
+ * Subscribes to company changes in the database
  */
-export function useTransactions(companyId: string | null) {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+export function useCompany(companyId: string | null) {
+  const [company, setCompany] = useState<Company | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     if (!companyId) {
-      setTransactions([]);
+      setCompany(null);
       setIsLoading(false);
       return;
     }
 
     let isMounted = true;
 
-    const fetchTransactions = async () => {
+    const fetchCompany = async () => {
       try {
         setIsLoading(true);
         setError(null);
-        const data = await getTransactionsByCompanyId(companyId);
+        const data = await getCompanyById(companyId);
         if (isMounted) {
-          setTransactions(data);
+          setCompany(data);
         }
       } catch (err) {
         if (isMounted) {
-          setError(err instanceof Error ? err : new Error('Failed to fetch transactions'));
+          setError(err instanceof Error ? err : new Error('Failed to fetch company'));
         }
       } finally {
         if (isMounted) {
@@ -39,22 +39,22 @@ export function useTransactions(companyId: string | null) {
       }
     };
 
-    fetchTransactions();
+    fetchCompany();
 
-    // Set up real-time subscription
+    // Set up real-time subscription to company changes
     const channel = supabase
-      .channel('transactions-changes')
+      .channel('company-changes')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'transactions',
-          filter: `company_id=eq.${companyId}`,
+          table: 'companies',
+          filter: `id=eq.${companyId}`,
         },
         () => {
           // Refetch on any change
-          fetchTransactions();
+          fetchCompany();
         }
       )
       .subscribe();
@@ -66,9 +66,8 @@ export function useTransactions(companyId: string | null) {
   }, [companyId]);
 
   return {
-    transactions,
+    company,
     isLoading,
     error,
   };
 }
-

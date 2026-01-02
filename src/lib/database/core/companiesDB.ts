@@ -1,5 +1,4 @@
 import { supabase } from '@/lib/utils/supabase';
-import { GAME_INITIALIZATION } from '@/lib/constants';
 
 /**
  * Company interface - only required fields, no optionals
@@ -56,6 +55,7 @@ export async function getCompanyByName(companyName: string): Promise<Company | n
 
 /**
  * Create a new company
+ * Note: Company is created with 0 money, starting capital is added via transaction
  */
 export async function createCompany(companyName: string): Promise<Company> {
   try {
@@ -63,7 +63,7 @@ export async function createCompany(companyName: string): Promise<Company> {
       .from('companies')
       .insert({
         name: companyName,
-        money: GAME_INITIALIZATION.STARTING_CAPITAL, // Starting capital from constants
+        money: 0, // Start with 0, transaction service will add starting capital
       })
       .select()
       .single();
@@ -190,4 +190,3 @@ export async function deleteCompany(companyId: string): Promise<void> {
     throw new Error(`Failed to delete company: ${error.message || error}`);
   }
 }
-

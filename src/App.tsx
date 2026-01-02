@@ -12,6 +12,7 @@ import { Facilities } from '@/components/pages/facilities';
 import { FacilityDetail } from '@/components/pages/facility-detail';
 import { Marketplace } from '@/components/pages/marketplace';
 import { setCurrentCompanyForNotifications, notificationService, initializeGameState, cleanupGameState } from '@/lib/services/core';
+import { useCompany } from '@/hooks';
 import type { Facility } from '@/lib/types/types';
 
 function App() {
@@ -27,13 +28,16 @@ function App() {
     };
   }, []);
   const [currentPage, setCurrentPage] = useState('login');
-  const [currentCompany, setCurrentCompany] = useState<any>(null);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [selectedFacilityId, setSelectedFacilityId] = useState<string | null>(null);
   const isAdmin = true; // TODO: Get from auth context
 
+  // Use the useCompany hook for real-time company updates
+  const { company: currentCompany } = useCompany(selectedCompanyId);
+
   const handleCompanySelected = (company: any) => {
-    setCurrentCompany(company);
+    setSelectedCompanyId(company.id);
     setCurrentPage('company-overview');
     
     // Initialize notification system for this company
@@ -45,7 +49,7 @@ function App() {
   };
 
   const handleBackToLogin = () => {
-    setCurrentCompany(null);
+    setSelectedCompanyId(null);
     setCurrentPage('login');
     
     // Clear notification system when logging out

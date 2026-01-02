@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button, Badge, Avatar, AvatarFallback, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui';
-import { formatGameDateFromObject } from '@/lib/utils';
+import { formatGameDateFromObject, formatNumber } from '@/lib/utils';
 import { NAVIGATION_EMOJIS } from '@/lib/utils/icons';
 import { useGameTick } from '@/hooks/useGameTick';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -132,7 +132,7 @@ export function Header({
               onClick={() => handleNavigation('finance')}
               title="View Finance"
             >
-              <span className="font-medium">€0</span>
+              <span className="font-medium">{formatNumber(currentCompany?.money ?? 0, { currency: true })}</span>
             </Badge>
             
             <Badge 
@@ -141,7 +141,7 @@ export function Header({
               onClick={() => handleNavigation('finance')}
               title="View Finance"
             >
-              <span className="font-medium text-xs">€0</span>
+              <span className="font-medium text-xs">{formatNumber(currentCompany?.money ?? 0, { currency: true })}</span>
             </Badge>
 
             {/* Console button - responsive */}
@@ -287,7 +287,7 @@ export function Header({
                     className="flex-1 py-1 flex items-center justify-center gap-1.5 bg-amber-50 text-amber-700"
                   >
                     <span>💰</span>
-                    <span className="font-medium">€0</span>
+                    <span className="font-medium">{formatNumber(currentCompany?.money ?? 0, { currency: true })}</span>
                   </Badge>
                 </div>
               </div>

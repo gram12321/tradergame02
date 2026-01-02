@@ -17,7 +17,7 @@ export async function getOrCreateCompany(companyName: string): Promise<Company> 
     // Company doesn't exist, create it
     const newCompany = await createCompany(companyName);
     
-    // Create starting capital transaction
+    // Create starting capital transaction (this updates company.money in DB)
     try {
       await createStartingCapitalTransaction(companyName);
     } catch (transactionError) {
@@ -25,9 +25,14 @@ export async function getOrCreateCompany(companyName: string): Promise<Company> 
       // Don't fail company creation if transaction fails - it can be added manually
     }
     
-    return newCompany;
+    // Fetch company again to get updated balance after transaction
+    const updatedCompany = await getCompanyByName(companyName);
+    if (!updatedCompany) {
+      throw new Error('Failed to fetch company after creation');
+    }
+    
+    return updatedCompany;
   } catch (error: any) {
     throw new Error(`Failed to login: ${error.message || error}`);
   }
 }
-

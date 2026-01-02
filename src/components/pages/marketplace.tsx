@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { ResourceId } from '@/lib/types/types';
 import {
   Card,
@@ -15,8 +15,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { getResourceName, getResourceIcon, RESOURCES_DATA } from '@/lib/constants';
 import { ShoppingCart, Search, TrendingUp, Package, Users, ArrowUpDown } from 'lucide-react';
 import { toast, formatNumber } from '@/lib/utils';
-import { useMarketListings, useLoadingState } from '@/hooks';
-import type { MarketListing } from '@/lib/database';
+import { useLoadingState } from '@/hooks';
+import { getActiveMarketListings, type MarketListing } from '@/lib/database';
 
 interface MarketplaceProps {
   currentCompany?: { id: string; name: string } | null;
@@ -30,9 +30,29 @@ export function Marketplace({ currentCompany, onBack: _onBack }: MarketplaceProp
   const [selectedResource, setSelectedResource] = useState<ResourceId | 'all'>('all');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const { isLoading: isPurchasing, withLoading: withPurchasingLoading } = useLoadingState();
+  
+  // Fetch market listings
+  const [listings, setListings] = useState<MarketListing[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
-  // Fetch market listings with realtime updates
-  const { listings, isLoading, error, refetch } = useMarketListings();
+  const fetchListings = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const data = await getActiveMarketListings();
+      setListings(data);
+    } catch (err) {
+      console.error('Error loading market listings:', err);
+      setError(err as Error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchListings();
+  }, []);
 
   // Calculate marketplace stats
   const stats = useMemo(() => {
@@ -124,7 +144,7 @@ export function Marketplace({ currentCompany, onBack: _onBack }: MarketplaceProp
           <CardContent className="py-12 text-center">
             <h3 className="text-lg font-semibold mb-2 text-destructive">Error Loading Marketplace</h3>
             <p className="text-muted-foreground mb-4">{error.message}</p>
-            <Button onClick={() => refetch()}>Try Again</Button>
+            <Button onClick={fetchListings}>Try Again</Button>
           </CardContent>
         </Card>
       </div>
@@ -254,7 +274,7 @@ export function Marketplace({ currentCompany, onBack: _onBack }: MarketplaceProp
                 {filteredListings.length} listing{filteredListings.length !== 1 ? 's' : ''} found
               </CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>
+            <Button variant="outline" size="sm" onClick={fetchListings}>
               <ArrowUpDown className="h-4 w-4 mr-2" />
               Refresh
             </Button>

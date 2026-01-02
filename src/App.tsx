@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Header } from '@/components/layout';
 import { Login } from '@/components/pages/login';
 import { CompanyOverview } from '@/components/pages/company-overview';
-import { Finance } from '@/components/pages/finance';
+import Finance from '@/components/pages/finance';
 import { Profile } from '@/components/pages/profile';
 import { Settings } from '@/components/pages/settings';
 import { AdminDashboard } from '@/components/pages/adminDashboard';
@@ -10,6 +10,7 @@ import { Achievements } from '@/components/pages/achievements';
 import { Highscores } from '@/components/pages/highscores';
 import { Facilities } from '@/components/pages/facilities';
 import { FacilityDetail } from '@/components/pages/facility-detail';
+import { Marketplace } from '@/components/pages/marketplace';
 import { setCurrentCompanyForNotifications, notificationService, initializeGameState, cleanupGameState } from '@/lib/services/core';
 import type { Facility } from '@/lib/types/types';
 
@@ -75,7 +76,7 @@ function App() {
           <Login onCompanySelected={handleCompanySelected} />
         );
       case 'finance':
-        return <Finance />;
+        return <Finance currentCompany={currentCompany} />;
       case 'profile':
         return (
           <Profile 
@@ -141,6 +142,13 @@ function App() {
               setSelectedFacilityId(facilityId);
               setCurrentPage('facility-detail');
             }}
+            onBack={() => setCurrentPage('company-overview')}
+          />
+        );
+      case 'marketplace':
+        return (
+          <Marketplace
+            currentCompany={currentCompany}
             onBack={() => setCurrentPage('company-overview')}
           />
         );

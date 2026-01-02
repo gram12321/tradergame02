@@ -4,5 +4,7 @@
 export * from './admin';
 export * from './core';
 export * from './facility';
+export * from './finance';
+export * from './market';
 export * from './production';
 export * from './user';

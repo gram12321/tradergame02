@@ -59,6 +59,7 @@ export function Header({
     { id: 'dashboard', label: 'Company', icon: NAVIGATION_EMOJIS.dashboard },
     { id: 'finance', label: 'Finance', icon: NAVIGATION_EMOJIS.finance },
     { id: 'facilities', label: 'Facilities', icon: NAVIGATION_EMOJIS.facilities },
+    { id: 'marketplace', label: 'Marketplace', icon: NAVIGATION_EMOJIS.marketplace },
   ];
 
   return (

@@ -13,4 +13,6 @@ export const GAME_INITIALIZATION = {
   STARTING_MONTH: 1,
   STARTING_YEAR: 2024,
   STARTING_TICK: 0,
+  // Starting capital for new companies
+  STARTING_CAPITAL: 1000,
 } as const;

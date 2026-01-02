@@ -6,3 +6,5 @@ export * from './useGameTick';
 
 // Centralized game data hooks
 export { useFacilities, useFacility } from './useGameData';
+export { useMarketListings, useMarketListingsByResource } from './useMarketListings';
+export { useTransactions } from './useTransactions';

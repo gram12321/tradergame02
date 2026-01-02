@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/utils/supabase';
+import { GAME_INITIALIZATION } from '@/lib/constants';
 
 /**
  * Company interface - only required fields, no optionals
@@ -62,7 +63,7 @@ export async function createCompany(companyName: string): Promise<Company> {
       .from('companies')
       .insert({
         name: companyName,
-        money: 10000, // Starting money
+        money: GAME_INITIALIZATION.STARTING_CAPITAL, // Starting capital from constants
       })
       .select()
       .single();

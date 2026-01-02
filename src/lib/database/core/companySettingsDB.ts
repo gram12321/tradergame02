@@ -85,3 +85,4 @@ export const deleteCompanySettings = async (companyName: string): Promise<{ succ
   }
 };
 
+

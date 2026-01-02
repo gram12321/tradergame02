@@ -5,6 +5,8 @@ import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../shadCN/dialog';
 import { Button } from '../../shadCN/button';
 import { applyStartingConditions } from '@/lib/services/core/startingConditionsService';
+import { GAME_INITIALIZATION } from '@/lib/constants/constants';
+import { formatNumber } from '@/lib/utils';
 
 interface StartingConditionsModalProps {
   isOpen: boolean;
@@ -68,7 +70,7 @@ export const StartingConditionsModal: React.FC<StartingConditionsModalProps> = (
           <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
             <h3 className="font-semibold text-blue-900 mb-2">Starting Capital</h3>
             <p className="text-sm text-gray-700">
-              Your company will start with <strong>€10,000</strong> in initial capital.
+              Your company will start with <strong>{formatNumber(GAME_INITIALIZATION.STARTING_MONEY, { currency: true })}</strong> in initial capital.
             </p>
           </div>
         </div>

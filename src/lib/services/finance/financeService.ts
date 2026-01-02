@@ -1,4 +1,4 @@
-import { getGameState, getCurrentCompanyName } from '../core/gameState';
+import { getGameState, getCurrentCompany, getCurrentCompanyName } from '../core/gameState';
 import type { Transaction } from '@/lib/types/types';
 import { GAME_INITIALIZATION } from '@/lib/constants';
 import { DAYS_PER_MONTH, MONTHS_PER_YEAR } from '@/lib/constants/constants';
@@ -167,18 +167,14 @@ export const calculateCompanyValue = async (): Promise<number> => {
   }
 };
 
-// Legacy export for backwards compatibility (deprecated - use calculateCompanyValue)
-export const calculateNetWorth = calculateCompanyValue;
 
-export const calculateTotalAssets = async (): Promise<number> => {
-  try {
-    const financialData = await calculateFinancialData('yearly');
-    return financialData.totalAssets;
-  } catch (error) {
-    console.error('Error calculating total assets:', error);
-    return 0;
-  }
-};
+/**
+ * Get current company money from the active company object
+ */
+async function getCurrentCompanyMoney(): Promise<number> {
+  const currentCompany = getCurrentCompany();
+  return currentCompany?.money ?? 0;
+}
 
 // Calculate financial data for income statement and balance sheet
 export const calculateFinancialData = async (
@@ -252,8 +248,9 @@ export const calculateFinancialData = async (
   
   const buildingsValue = 0;
   
-  // Wine/vineyard asset calculations removed
-  const cashMoney = gameState.money || 0;
+  // Get current company money from database (source of truth)
+  const cashMoney = await getCurrentCompanyMoney();
+  
   const fixedAssets = buildingsValue;
   const currentAssets = 0;
   const totalAssets = cashMoney + fixedAssets + currentAssets;
@@ -424,8 +421,9 @@ export async function calculateFinancialDataRollingNDays(
   // Note: Assets are current snapshot values, not historical, so we use current values
   const buildingsValue = 0;
   
-  // Note: Asset calculations removed as they reference wine/vineyard systems
-  const cashMoney = gameState.money || 0;
+  // Get current company money from database (source of truth)
+  const cashMoney = await getCurrentCompanyMoney();
+  
   const fixedAssets = buildingsValue;
   const currentAssets = 0;
   const totalAssets = cashMoney + fixedAssets + currentAssets;

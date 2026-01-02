@@ -45,7 +45,7 @@ export async function adminClearCompanyValueHighscores(): Promise<{ success: boo
  * Clear all companies from database
  */
 export async function adminClearAllCompanies(): Promise<void> {
-  const { error } = await supabase.from('companies').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  const { error } = await supabase.from('companies').delete().neq('name', '');
   if (error) throw error;
 }
 
@@ -96,7 +96,7 @@ export async function adminFullDatabaseReset(): Promise<void> {
       'notifications',         // References companies
       'highscores',            // References companies
       'transactions',          // References companies
-      'game_state',            // References companies (id is FK to companies.id)
+      'game_state',            // References companies (company_name is FK to companies.name)
       'company_settings',      // References companies
       'companies'              // Top-level parent table
     ];
@@ -109,7 +109,10 @@ export async function adminFullDatabaseReset(): Promise<void> {
         let deleteQuery;
 
         // Handle different table structures
-        if (table === 'notification_filters' || table === 'notifications') {
+        if (table === 'companies') {
+          // Companies table uses name as primary key (not id)
+          deleteQuery = supabase.from(table).delete().neq('name', '');
+        } else if (table === 'notification_filters' || table === 'notifications') {
           // These tables use text id - use empty string to match all non-empty IDs (all rows)
           deleteQuery = supabase.from(table).delete().neq('id', '');
         } else {

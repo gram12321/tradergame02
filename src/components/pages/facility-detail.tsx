@@ -554,28 +554,19 @@ export function FacilityDetail({ facilityId, currentCompany: _currentCompany, on
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Production Status</p>
                   {facility.isProducing ? (
-                    hasRequiredInputs(facility.activeRecipeId!) ? (
-                      <Badge 
-                        variant="outline" 
-                        className="text-xs bg-green-100 text-green-800 border-green-200 relative"
-                      >
-                        <div className="absolute inset-0 bg-green-300 opacity-50 animate-[ping_2s_ease-in-out_infinite] rounded-md" />
-                        <span className="relative z-10">Producing</span>
-                      </Badge>
-                    ) : (
-                      <Badge 
-                        variant="outline" 
-                        className="text-xs bg-orange-100 text-orange-800 border-orange-200"
-                      >
-                        Needs Input
-                      </Badge>
-                    )
+                    <Badge 
+                      variant="outline" 
+                      className="text-xs bg-green-100 text-green-800 border-green-200 relative"
+                    >
+                      <div className="absolute inset-0 bg-green-300 opacity-50 animate-[ping_2s_ease-in-out_infinite] rounded-md" />
+                      <span className="relative z-10">Producing</span>
+                    </Badge>
                   ) : (
                     <Badge 
                       variant="outline" 
-                      className="text-xs bg-gray-100 text-gray-800 border-gray-200"
+                      className="text-xs bg-orange-100 text-orange-800 border-orange-200"
                     >
-                      Stopped
+                      Missing Inputs
                     </Badge>
                   )}
                 </div>
@@ -898,27 +889,20 @@ export function FacilityDetail({ facilityId, currentCompany: _currentCompany, on
                               </CardTitle>
                               <CardDescription>Currently producing: {activeRecipe.name}</CardDescription>
                             </div>
-                            {!facility.isProducing ? (
-                              <Badge 
-                                variant="outline" 
-                                className="text-xs bg-gray-100 text-gray-800 border-gray-200"
-                              >
-                                Stopped
-                              </Badge>
-                            ) : !hasRequiredInputs(facility.activeRecipeId!) ? (
-                              <Badge 
-                                variant="outline" 
-                                className="text-xs bg-orange-100 text-orange-800 border-orange-200"
-                              >
-                                Needs Input
-                              </Badge>
-                            ) : (
+                            {facility.isProducing ? (
                               <Badge 
                                 variant="outline" 
                                 className="text-xs bg-green-100 text-green-800 border-green-200 relative"
                               >
                                 <div className="absolute inset-0 bg-green-300 opacity-50 animate-[ping_2s_ease-in-out_infinite] rounded-md" />
                                 <span className="relative z-10">Producing</span>
+                              </Badge>
+                            ) : (
+                              <Badge 
+                                variant="outline" 
+                                className="text-xs bg-orange-100 text-orange-800 border-orange-200"
+                              >
+                                Missing Inputs
                               </Badge>
                             )}
                           </div>

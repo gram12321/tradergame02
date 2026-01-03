@@ -129,9 +129,13 @@ async function advanceAllFacilitiesProduction(supabase: any): Promise<number> {
 
 /**
  * Complete a production cycle for a facility
+ * Handles production completion with overflow carry-over
  */
 async function completeProduction(facility: any, recipe: any, supabase: any): Promise<boolean> {
   try {
+    // Calculate overflow progress (supports fractional progress systems)
+    const overflow = facility.progress_ticks - recipe.processing_ticks;
+
     // Apply effectivity to outputs
     const effectivityMultiplier = facility.effectivity / 100;
     const outputs = recipe.outputs.map((output: any) => ({
@@ -139,23 +143,31 @@ async function completeProduction(facility: any, recipe: any, supabase: any): Pr
       quantity: Math.floor(output.quantity * effectivityMultiplier),
     }));
 
-    // Update inventory
-    const newInventory = applyRecipeToInventory(
-      facility.inventory,
-      recipe.inputs,
-      outputs
-    );
+    // Add outputs to inventory (no input consumption - inputs were consumed at cycle start)
+    const inventoryWithOutputs = addOutputsToInventory(facility.inventory, outputs);
 
-    // Check if we can continue (have inputs for next cycle)
-    const canContinue = checkHasInputs(newInventory, recipe.inputs);
+    // Check if we can start next cycle (have inputs available)
+    const canContinue = checkHasInputs(inventoryWithOutputs, recipe.inputs);
+
+    let finalInventory = inventoryWithOutputs;
+    let finalProgress = overflow;
+    
+    if (canContinue) {
+      // Consume inputs for next cycle and carry over progress
+      finalInventory = consumeInputsFromInventory(inventoryWithOutputs, recipe.inputs);
+      // Progress starts at overflow (carry-over from previous cycle)
+    } else {
+      // No inputs for next cycle - stop production, keep overflow progress
+      finalProgress = facility.progress_ticks;
+    }
 
     // Update facility
     const { error } = await supabase
       .from('facilities')
       .update({
-        inventory: newInventory,
+        inventory: finalInventory,
         is_producing: canContinue,
-        progress_ticks: canContinue ? 0 : facility.progress_ticks,
+        progress_ticks: finalProgress,
       })
       .eq('id', facility.id);
 
@@ -171,12 +183,11 @@ async function completeProduction(facility: any, recipe: any, supabase: any): Pr
 }
 
 /**
- * Apply recipe inputs/outputs to inventory
+ * Consume inputs from inventory (at production start/continuation)
  */
-function applyRecipeToInventory(
+function consumeInputsFromInventory(
   inventory: any,
-  inputs: Array<{ resourceId: string; quantity: number }>,
-  outputs: Array<{ resourceId: string; quantity: number }>
+  inputs: Array<{ resourceId: string; quantity: number }>
 ): any {
   const items = [...(inventory?.items || [])];
 
@@ -190,6 +201,24 @@ function applyRecipeToInventory(
       }
     }
   }
+
+  const currentUsage = items.reduce((sum: number, item: any) => sum + item.quantity, 0);
+
+  return {
+    items,
+    capacity: inventory?.capacity || 1000,
+    currentUsage,
+  };
+}
+
+/**
+ * Add outputs to inventory (at production completion)
+ */
+function addOutputsToInventory(
+  inventory: any,
+  outputs: Array<{ resourceId: string; quantity: number }>
+): any {
+  const items = [...(inventory?.items || [])];
 
   // Add outputs to inventory
   for (const output of outputs) {

@@ -13,7 +13,7 @@ export interface ProductionAdvancementResult {
 
 /**
  * Start or change production recipe at a facility
- * Always resets progress to 0 when changing recipes
+ * Sets the recipe and starts production - inputs will be consumed at completion of current cycle
  * 
  * @param facility - The facility to start/change production at
  * @param recipeId - The recipe ID to produce
@@ -29,7 +29,7 @@ export async function startProduction(
       return null;
     }
 
-    // Initialize or change production (always reset progress and start producing)
+    // Simply start production - inputs consumed at cycle completion
     return await updateFacility(facility.id, {
       activeRecipeId: recipeId,
       isProducing: true,

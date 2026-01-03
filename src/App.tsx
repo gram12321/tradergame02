@@ -12,14 +12,18 @@ import { Facilities } from '@/components/pages/facilities';
 import { FacilityDetail } from '@/components/pages/facility-detail';
 import { Marketplace } from '@/components/pages/marketplace';
 import { setCurrentCompanyForNotifications, notificationService, initializeGameState, cleanupGameState } from '@/lib/services/core';
+import { loadGameData } from '@/lib/constants/gameData';
 import { useCompany } from '@/hooks';
 import type { Facility } from '@/lib/types/types';
 
 function App() {
-  // Initialize game state from database on mount
+  // Initialize game state and load all game data from database
   useEffect(() => {
-    initializeGameState().catch((error) => {
-      console.error('Failed to initialize game state:', error);
+    Promise.all([
+      initializeGameState(),
+      loadGameData(),
+    ]).catch((error) => {
+      console.error('Failed to initialize app:', error);
     });
 
     // Cleanup on unmount

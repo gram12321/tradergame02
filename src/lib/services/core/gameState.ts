@@ -1,7 +1,7 @@
 import type { GameState, GameTime } from '@/lib/types/types';
-import { DAYS_PER_MONTH, MONTHS_PER_YEAR, GAME_INITIALIZATION } from '@/lib/constants';
+import { GAME_INITIALIZATION } from '@/lib/constants';
 import { notificationService } from './notificationService';
-import { saveGameTimeToDB, getGameTimeFromDB } from '@/lib/database/core/gameTimeDB';
+import { getGameTimeFromDB } from '@/lib/database/core/gameTimeDB';
 import { supabase } from '@/lib/utils/supabase';
 import { advanceAllFacilitiesProduction } from '@/lib/services/production';
 import { refreshAllActiveFacilities } from './gameData';
@@ -138,80 +138,40 @@ export function setCurrentCompanyForNotifications(companyName: string): void {
   currentCompanyForNotifications = companyName;
 }
 
-function advanceGameTime(updateNextTickTime: boolean = true): GameTime {
-  let { day, month, year, tick, nextTickTime } = gameState.time;
-  
-  tick += 1;
-  day += 1;
-  
-  if (day > DAYS_PER_MONTH) {
-    day = 1;
-    month += 1;
-  }
-  
-  if (month > MONTHS_PER_YEAR) {
-    month = 1;
-    year += 1;
-  }
-  
-  if (updateNextTickTime) {
-    nextTickTime = getNextHourBoundary().toISOString();
-  }
-  
-  return {
-    tick,
-    day,
-    month,
-    year,
-    lastTickTime: new Date().toISOString(),
-    nextTickTime,
-  };
-}
-
-async function processTickInternal(isManual: boolean): Promise<void> {
+/**
+ * Process manual game tick (admin control only)
+ * Calls the edge function which handles all game logic
+ * Automatic ticks are handled by the Edge Function with cron
+ */
+export async function processGameTickManual(): Promise<void> {
   if (gameState.isProcessing) return;
   
   gameState.isProcessing = true;
   
   try {
-    const newTime = advanceGameTime(!isManual);
-    
-    const saved = await saveGameTimeToDB(newTime);
-    if (!saved) {
-      console.error('Failed to save game time to database');
-    }
-
-    // Advance production for all facilities with active production
-    await advanceAllFacilitiesProduction();
+    // Call edge function - it handles time advancement and production
+    const facilitiesAdvanced = await advanceAllFacilitiesProduction();
 
     // Refresh UI data for all active companies
     await refreshAllActiveFacilities();
 
-    setGameState({ ...gameState, time: newTime, isProcessing: false });
+    // Game time will be updated via real-time subscription
+    // But set processing to false
+    gameState.isProcessing = false;
     
-    if (currentCompanyForNotifications) {
-      const icon = isManual ? '🎮' : '⏰';
-      const source = isManual ? 'Admin manually' : 'Time automatically';
+    if (currentCompanyForNotifications && facilitiesAdvanced > 0) {
       notificationService.addMessage(
-        `${icon} ${source} advanced time to Day ${newTime.day}, Month ${newTime.month}, ${newTime.year}`,
-        isManual ? 'admin_manual_advance' : 'game_time_system',
-        isManual ? 'Admin Control' : 'Time System',
+        `🎮 Admin manually advanced time - ${facilitiesAdvanced} facilities processed`,
+        'admin_manual_advance',
+        'Admin Control',
         'time',
         currentCompanyForNotifications
       );
     }
   } catch (error) {
-    console.error('Error processing game tick:', error);
+    console.error('Error processing manual game tick:', error);
     gameState.isProcessing = false;
   }
-}
-
-export async function processGameTick(): Promise<void> {
-  return processTickInternal(false);
-}
-
-export async function processGameTickManual(): Promise<void> {
-  return processTickInternal(true);
 }
 
 export function setProcessingState(isProcessing: boolean): void {

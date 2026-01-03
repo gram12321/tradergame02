@@ -32,11 +32,7 @@ export function Header({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isMobile = useIsMobile();
   const { isLoading: isAdvancing, withLoading } = useLoadingState();
-  const { gameState, isProcessing, handleAdvanceTick } = useGameTick({
-    facilities,
-    onFacilitiesUpdate,
-    autoAdvanceEnabled: true,
-  });
+  const { gameState, isProcessing, handleAdvanceTick } = useGameTick();
   
   // Notification system
   const { unreadCount, isHistoryOpen, openHistory, closeHistory } = useNotifications(currentCompany?.name || '');
@@ -128,7 +124,7 @@ export function Header({
             {/* Money display - responsive */}
             <Badge 
               variant="outline" 
-              className="bg-red-700 text-white border-red-500 px-2 py-0.5 flex items-center cursor-pointer hover:bg-red-600 transition-colors hidden sm:flex"
+              className="bg-red-700 text-white border-red-500 px-2 py-0.5 hidden sm:flex items-center cursor-pointer hover:bg-red-600 transition-colors"
               onClick={() => handleNavigation('finance')}
               title="View Finance"
             >
@@ -149,7 +145,7 @@ export function Header({
               variant="ghost" 
               size="icon"
               onClick={openHistory}
-              className="rounded-full h-8 w-8 flex items-center justify-center text-white hover:bg-red-700 relative hidden sm:flex"
+              className="rounded-full h-8 w-8 hidden sm:flex items-center justify-center text-white hover:bg-red-700 relative"
             >
               <MessageSquareText className="h-4 w-4" />
               {unreadCount > 0 && (
@@ -195,7 +191,7 @@ export function Header({
             {/* Desktop menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center space-x-2 p-1 rounded-full h-8 w-8 text-white hover:bg-red-700 hidden lg:flex">
+                <Button variant="ghost" className="hidden lg:flex items-center space-x-2 p-1 rounded-full h-8 w-8 text-white hover:bg-red-700">
                   <Avatar>
                     <AvatarFallback className="bg-red-600 text-white">
                       {currentCompany?.name ? currentCompany.name.substring(0, 2).toUpperCase() : 'CO'}

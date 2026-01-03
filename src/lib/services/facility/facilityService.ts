@@ -1,6 +1,6 @@
 import type { Facility, ProductionFacilityType, RecipeId } from '@/lib/types/types';
 import { createFacilityDB, generateFacilityName } from '@/lib/database';
-import { getFacilityTypeConfig, createInitialInventory, DEFAULT_FACILITY_CONFIG, getRecipe } from '@/lib/constants';
+import { getAllFacilityTypeConfigs, createInitialInventory, DEFAULT_FACILITY_CONFIG, getRecipe } from '@/lib/constants';
 
 /**
  * Create a new facility of the specified type with default settings
@@ -17,7 +17,11 @@ export async function createFacility(
   companyName: string,
   cityId: string
 ): Promise<Facility> {
-  const config = getFacilityTypeConfig(facilityType);
+  const config = getAllFacilityTypeConfigs()[facilityType];
+  if (!config) {
+    throw new Error(`Unknown facility type: ${facilityType}`);
+  }
+  
   const facilityName = await generateFacilityName(
     companyId,
     companyName,

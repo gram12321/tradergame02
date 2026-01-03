@@ -33,9 +33,9 @@ export type FacilityType = 'production' | 'warehouse' | 'retail';
 
 /**
  * Production facility type
- * Specific production facility types (farm, mill, bakery, etc.)
+ * Facility types are now loaded from database, so this is a string
  */
-export type ProductionFacilityType = 'farm' | 'mill' | 'bakery';
+export type ProductionFacilityType = string;
 
 /**
  * Facility inventory entry
@@ -79,9 +79,10 @@ export interface Facility {
   // Recipe system
   availableRecipeIds: RecipeId[]; // Recipes this facility can use
   
-  // Active production
-  activeRecipeId?: RecipeId; // Currently processing recipe (undefined if idle)
-  progressTicks?: number; // Number of ticks completed for current production (0 to processingTicks)
+  // Active production (always set for production facilities)
+  activeRecipeId: RecipeId; // Currently selected recipe
+  isProducing: boolean; // Whether production is actively running
+  progressTicks: number; // Number of ticks completed for current production (0 to processingTicks)
 
   
   // Financial
@@ -122,28 +123,28 @@ export interface GameState {
 
 /**
  * Resource ID type
+ * Resources are now loaded from database, so this is a string
  */
-export type ResourceId = 'grain' | 'flour' | 'bread';
+export type ResourceId = string;
 
 /**
  * Resource definition
  * Resources are the items that flow through the game economy
  */
 export interface Resource {
-  id: ResourceId;
+  id: string;
   name: string;
-  quality?: number; // Quality value (1->inf scale, higher is better)
-
+  icon: string; // Emoji/icon for display
 }
 // ============================================================================
 // RECIPE SYSTEM
 // ============================================================================
 
-
 /**
  * Recipe ID type
+ * Recipes are now loaded from database, so this is a string
  */
-export type RecipeId = 'grow_grain' | 'mill_grain' | 'bake_bread';
+export type RecipeId = string;
 
 /**
  * Recipe input/output item

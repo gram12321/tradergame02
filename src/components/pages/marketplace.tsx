@@ -12,7 +12,7 @@ import {
   Select,
 } from '@/components/ui';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/shadCN/table';
-import { getResourceName, getResourceIcon, RESOURCES_DATA } from '@/lib/constants';
+import { getResourceName, getResourceIcon, getAllResources } from '@/lib/constants';
 import { ShoppingCart, Search, TrendingUp, Package, Users, ArrowUpDown } from 'lucide-react';
 import { toast, formatNumber } from '@/lib/utils';
 import { useLoadingState } from '@/hooks';

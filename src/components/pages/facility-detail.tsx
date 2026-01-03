@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import type { RecipeId, ResourceId } from '@/lib/types/types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, Button, Badge, Input, UnifiedTooltip, Switch, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, Button, Badge, Input, Switch, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/shadCN/table';
 import { updateFacility } from '@/lib/database';
-import { getRecipe, getResourceName, getResourceIcon, RESOURCES_DATA } from '@/lib/constants';
-import { startProduction, stopProduction, checkRecipeAvailability, createMultipleListings } from '@/lib/services';
+import { getRecipe, getResourceName, getResourceIcon, getAllResources } from '@/lib/constants';
+import { startProduction, stopProduction, createMultipleListings } from '@/lib/services';
 import { getGameState } from '@/lib/services/core';
-import { getTailwindClasses } from '@/lib/utils/colorMapping';
-import { Building2, Factory, Warehouse, Store, ArrowLeft, Square, Pencil, Check, X } from 'lucide-react';
+import { Building2, Factory, Warehouse, Store, ArrowLeft, Pencil, Check, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast, formatNumber } from '@/lib/utils';
 import { useLoadingState, useFacility } from '@/hooks';
 
@@ -20,10 +19,15 @@ interface FacilityDetailProps {
 export function FacilityDetail({ facilityId, currentCompany: _currentCompany, onBack }: FacilityDetailProps) {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
-  const [selectedRecipeId, setSelectedRecipeId] = useState<RecipeId | ''>('');
-  const [showOnlyActive, setShowOnlyActive] = useState(false);
+  const [showAvailableOnly, setShowAvailableOnly] = useState(false);
   const [showRecipes, setShowRecipes] = useState(false);
   const [forSaleValues, setForSaleValues] = useState<Record<string, number>>({});
+  const [expandedSections, setExpandedSections] = useState({
+    activeRecipeInputs: true,
+    facilityInputs: true,
+    facilityOutputs: true,
+    otherResources: false,
+  });
   const [salePrices, setSalePrices] = useState<Record<string, number>>({});
   const inputRef = useRef<HTMLInputElement>(null);
   const { isLoading: isStarting, withLoading: withStartingLoading } = useLoadingState();
@@ -35,12 +39,24 @@ export function FacilityDetail({ facilityId, currentCompany: _currentCompany, on
   // Use centralized game data hook for realtime facility updates
   const { facility, isLoading } = useFacility(facilityId);
 
-  // Set default selected recipe when facility loads
-  useEffect(() => {
-    if (facility && facility.availableRecipeIds.length > 0 && !selectedRecipeId) {
-      setSelectedRecipeId(facility.availableRecipeIds[0]);
-    }
-  }, [facility, selectedRecipeId]);
+  // Toggle section expand/collapse
+  const toggleSection = (section: keyof typeof expandedSections) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
+  };
+
+  // Check if facility has required inputs for a recipe
+  const hasRequiredInputs = (recipeId: RecipeId): boolean => {
+    if (!facility) return false;
+    
+    const recipe = getRecipe(recipeId);
+    return recipe?.inputs.every(input => {
+      const inventoryItem = facility.inventory.items.find(i => i.resourceId === input.resourceId);
+      return inventoryItem && inventoryItem.quantity >= input.quantity;
+    }) ?? false;
+  };
 
   const handleStartProduction = async (recipeId: RecipeId) => {
     if (!facility) return;
@@ -51,14 +67,14 @@ export function FacilityDetail({ facilityId, currentCompany: _currentCompany, on
         const recipe = getRecipe(recipeId);
         toast({
           title: 'Production Started',
-          description: `Started producing: ${recipe.name}`,
+          description: `Started producing: ${recipe?.name || 'Unknown Recipe'}`,
         });
         setShowRecipes(false); // Hide recipes after starting production
       } else {
         toast({
-          title: 'Error',
-          description: 'Failed to start production. Check if facility has required inputs.',
-          variant: 'destructive',
+          title: 'Waiting for Inputs',
+          description: 'Production will start automatically when required inputs are available.',
+          variant: 'default',
         });
       }
     });
@@ -72,7 +88,7 @@ export function FacilityDetail({ facilityId, currentCompany: _currentCompany, on
       if (updatedFacility) {
         toast({
           title: 'Production Stopped',
-          description: 'Production has been cancelled.',
+          description: 'Production has been paused. You can resume by selecting the same recipe.',
         });
       } else {
         toast({
@@ -152,7 +168,7 @@ export function FacilityDetail({ facilityId, currentCompany: _currentCompany, on
     const wasCompleted = !facility.activeRecipeId && !!lastActiveRecipeRef.current;
     
     if (wasCompleted) {
-      const recipeName = getRecipe(lastActiveRecipeRef.current!).name;
+      const recipeName = getRecipe(lastActiveRecipeRef.current!)?.name || 'Unknown';
       toast({
         title: 'Production Complete',
         description: `Completed: ${recipeName}`,
@@ -200,14 +216,14 @@ export function FacilityDetail({ facilityId, currentCompany: _currentCompany, on
       const recipe = getRecipe(facility.activeRecipeId);
       
       // Check if this resource is produced
-      const outputItem = recipe.outputs.find(o => o.resourceId === resourceId);
-      if (outputItem) {
+      const outputItem = recipe?.outputs.find(o => o.resourceId === resourceId);
+      if (outputItem && recipe) {
         production = outputItem.quantity / recipe.processingTicks; // per tick
       }
 
       // Check if this resource is consumed
-      const inputItem = recipe.inputs.find(i => i.resourceId === resourceId);
-      if (inputItem) {
+      const inputItem = recipe?.inputs.find(i => i.resourceId === resourceId);
+      if (inputItem && recipe) {
         consumption = inputItem.quantity / recipe.processingTicks; // per tick
       }
     }
@@ -319,43 +335,77 @@ export function FacilityDetail({ facilityId, currentCompany: _currentCompany, on
     });
   };
 
-  // Get filtered resources based on "Show Active Only" toggle
-  const getFilteredResources = () => {
-    if (!facility) return [];
+  // Get categorized resources for the 4 sublists
+  const getCategorizedResources = () => {
+    if (!facility) return {
+      activeRecipeInputs: [],
+      facilityInputs: [],
+      facilityOutputs: [],
+      otherResources: [],
+    };
 
     // Get all possible resource IDs from the resources data
-    const allResourceIds = Object.keys(RESOURCES_DATA) as ResourceId[];
+    const allResourceIds = Object.keys(getAllResources()) as ResourceId[];
 
-    return allResourceIds.filter(resourceId => {
-      if (!showOnlyActive) {
-        // Show all resources that exist in inventory
-        return facility.inventory.items.some(item => item.resourceId === resourceId);
-      }
+    // Get active recipe inputs
+    const activeRecipeInputs = new Set<ResourceId>();
+    if (facility.activeRecipeId) {
+      const activeRecipe = getRecipe(facility.activeRecipeId);
+      activeRecipe?.inputs.forEach(input => {
+        activeRecipeInputs.add(input.resourceId);
+      });
+    }
 
-      // Show active resources only
-      // 1. Check if resource exists in inventory with quantity > 0
-      const inventoryItem = facility.inventory.items.find(item => item.resourceId === resourceId);
-      if (inventoryItem && inventoryItem.quantity > 0) return true;
-
-      // 2. Check if resource is for sale
-      if (forSaleValues[resourceId] > 0) return true;
-
-      // 3. Check if resource is part of active recipe
-      if (facility.activeRecipeId) {
-        const recipe = getRecipe(facility.activeRecipeId);
-        const isInput = recipe.inputs.some(i => i.resourceId === resourceId);
-        const isOutput = recipe.outputs.some(o => o.resourceId === resourceId);
-        if (isInput || isOutput) return true;
-      }
-
-      // 4. Check if resource has any metrics
-      const metrics = calculateResourceMetrics(resourceId);
-      if (metrics.production > 0 || metrics.consumption > 0 || metrics.import > 0 || metrics.export > 0) {
-        return true;
-      }
-
-      return false;
+    // Get all possible inputs from available recipes (facility inputs)
+    const facilityInputs = new Set<ResourceId>();
+    facility.availableRecipeIds.forEach(recipeId => {
+      const recipe = getRecipe(recipeId);
+      recipe?.inputs.forEach(input => {
+        facilityInputs.add(input.resourceId);
+      });
     });
+
+    // Get all possible outputs from available recipes (facility outputs)
+    const facilityOutputs = new Set<ResourceId>();
+    facility.availableRecipeIds.forEach(recipeId => {
+      const recipe = getRecipe(recipeId);
+      recipe?.outputs.forEach(output => {
+        facilityOutputs.add(output.resourceId);
+      });
+    });
+
+    // Filter function based on "Show Available Only" toggle
+    const shouldShowResource = (resourceId: ResourceId) => {
+      if (showAvailableOnly) {
+        const inventoryItem = facility.inventory.items.find(item => item.resourceId === resourceId);
+        return inventoryItem && inventoryItem.quantity > 0;
+      }
+      return true;
+    };
+
+    // Categorize resources
+    const categorized = {
+      activeRecipeInputs: [] as ResourceId[],
+      facilityInputs: [] as ResourceId[],
+      facilityOutputs: [] as ResourceId[],
+      otherResources: [] as ResourceId[],
+    };
+
+    allResourceIds.forEach(resourceId => {
+      if (!shouldShowResource(resourceId)) return;
+
+      if (activeRecipeInputs.has(resourceId)) {
+        categorized.activeRecipeInputs.push(resourceId);
+      } else if (facilityInputs.has(resourceId)) {
+        categorized.facilityInputs.push(resourceId);
+      } else if (facilityOutputs.has(resourceId)) {
+        categorized.facilityOutputs.push(resourceId);
+      } else {
+        categorized.otherResources.push(resourceId);
+      }
+    });
+
+    return categorized;
   };
 
   if (isLoading) {
@@ -503,22 +553,35 @@ export function FacilityDetail({ facilityId, currentCompany: _currentCompany, on
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Production Status</p>
-                  {facility.activeRecipeId ? (
-                    <Badge 
-                      variant="outline" 
-                      className="text-xs bg-green-100 text-green-800 border-green-200 relative"
-                    >
-                      <div className="absolute inset-0 bg-green-300 opacity-50 animate-[ping_2s_ease-in-out_infinite] rounded-md" />
-                      <span className="relative z-10">Producing</span>
-                    </Badge>
+                  {facility.isProducing ? (
+                    hasRequiredInputs(facility.activeRecipeId!) ? (
+                      <Badge 
+                        variant="outline" 
+                        className="text-xs bg-green-100 text-green-800 border-green-200 relative"
+                      >
+                        <div className="absolute inset-0 bg-green-300 opacity-50 animate-[ping_2s_ease-in-out_infinite] rounded-md" />
+                        <span className="relative z-10">Producing</span>
+                      </Badge>
+                    ) : (
+                      <Badge 
+                        variant="outline" 
+                        className="text-xs bg-orange-100 text-orange-800 border-orange-200"
+                      >
+                        Needs Input
+                      </Badge>
+                    )
                   ) : (
                     <Badge 
                       variant="outline" 
-                      className="text-xs bg-amber-100 text-amber-800 border-amber-200"
+                      className="text-xs bg-gray-100 text-gray-800 border-gray-200"
                     >
-                      Not Producing
+                      Stopped
                     </Badge>
                   )}
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Selected Recipe</p>
+                  <p className="font-semibold">{getRecipe(facility.activeRecipeId!)?.name || 'Unknown Recipe'}</p>
                 </div>
               </div>
               <div className="mt-4 pt-4 border-t">
@@ -550,15 +613,15 @@ export function FacilityDetail({ facilityId, currentCompany: _currentCompany, on
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
                       <Switch
-                        id="showActiveOnly"
-                        checked={showOnlyActive}
-                        onCheckedChange={setShowOnlyActive}
+                        id="showAvailableOnly"
+                        checked={showAvailableOnly}
+                        onCheckedChange={setShowAvailableOnly}
                       />
                       <label
-                        htmlFor="showActiveOnly"
+                        htmlFor="showAvailableOnly"
                         className="text-sm font-medium cursor-pointer select-none"
                       >
-                        Show active only
+                        Show available only
                       </label>
                     </div>
                     <Badge variant="outline">
@@ -566,112 +629,212 @@ export function FacilityDetail({ facilityId, currentCompany: _currentCompany, on
                     </Badge>
                   </div>
                 </div>
-              {getFilteredResources().length === 0 ? (
-                <p className="text-muted-foreground italic py-4 text-center">
-                  {showOnlyActive ? 'No active resources' : 'No items in inventory'}
-                </p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[180px]">Resource</TableHead>
-                        <TableHead className="text-center w-[80px]">Import</TableHead>
-                        <TableHead className="text-center w-[80px]">Export</TableHead>
-                        <TableHead className="text-center w-[100px]">Production</TableHead>
-                        <TableHead className="text-center w-[110px]">Consumption</TableHead>
-                        <TableHead className="text-center w-[80px]">Net</TableHead>
-                        <TableHead className="text-center w-[100px]">Source Cost</TableHead>
-                        <TableHead className="text-center w-[100px]">For Sale</TableHead>
-                        <TableHead className="text-center w-[100px]">Sale Price</TableHead>
-                        <TableHead className="text-right w-[100px]">Amount</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {getFilteredResources().map((resourceId) => {
-                        const inventoryItem = facility.inventory.items.find(i => i.resourceId === resourceId);
-                        const amount = inventoryItem?.quantity || 0;
-                        const metrics = calculateResourceMetrics(resourceId);
+              {(() => {
+                const categorized = getCategorizedResources();
+                const totalResources = categorized.activeRecipeInputs.length + 
+                                     categorized.facilityInputs.length + 
+                                     categorized.facilityOutputs.length + 
+                                     categorized.otherResources.length;
 
-                        return (
-                          <TableRow key={resourceId}>
-                            {/* Resource */}
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <span className="text-lg">{getResourceIcon(resourceId)}</span>
-                                <span className="font-medium">{getResourceName(resourceId)}</span>
-                              </div>
-                            </TableCell>
+                if (totalResources === 0) {
+                  return (
+                    <p className="text-muted-foreground italic py-4 text-center">
+                      {showAvailableOnly ? 'No available resources' : 'No items in inventory'}
+                    </p>
+                  );
+                }
 
-                            {/* Import */}
-                            <TableCell className="text-center text-blue-600">
-                              {metrics.import > 0 ? formatNumber(metrics.import, { decimals: 1, smartDecimals: true }) : '-'}
-                            </TableCell>
+                const renderResourceRow = (resourceId: ResourceId) => {
+                  const inventoryItem = facility.inventory.items.find(i => i.resourceId === resourceId);
+                  const amount = inventoryItem?.quantity || 0;
+                  const metrics = calculateResourceMetrics(resourceId);
 
-                            {/* Export */}
-                            <TableCell className="text-center text-purple-600">
-                              {metrics.export > 0 ? formatNumber(metrics.export, { decimals: 1, smartDecimals: true }) : '-'}
-                            </TableCell>
+                  return (
+                    <TableRow key={resourceId}>
+                      {/* Resource */}
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{getResourceIcon(resourceId)}</span>
+                          <span className="font-medium">{getResourceName(resourceId)}</span>
+                        </div>
+                      </TableCell>
 
-                            {/* Production */}
-                            <TableCell className="text-center text-green-600">
-                              {metrics.production > 0 ? formatNumber(metrics.production, { decimals: 1, smartDecimals: true }) : '-'}
-                            </TableCell>
+                      {/* Import */}
+                      <TableCell className="text-center text-blue-600">
+                        {metrics.import > 0 ? formatNumber(metrics.import, { decimals: 1, smartDecimals: true }) : '-'}
+                      </TableCell>
 
-                            {/* Consumption */}
-                            <TableCell className="text-center text-red-600">
-                              {metrics.consumption > 0 ? formatNumber(metrics.consumption, { decimals: 1, smartDecimals: true }) : '-'}
-                            </TableCell>
+                      {/* Export */}
+                      <TableCell className="text-center text-purple-600">
+                        {metrics.export > 0 ? formatNumber(metrics.export, { decimals: 1, smartDecimals: true }) : '-'}
+                      </TableCell>
 
-                            {/* Net */}
-                            <TableCell className="text-center">
-                              <span className={getNetValueColor(metrics.netChange)}>
-                                {metrics.netChange !== 0 ? formatWithSign(metrics.netChange) : '-'}
-                              </span>
-                            </TableCell>
+                      {/* Production */}
+                      <TableCell className="text-center text-green-600">
+                        {metrics.production > 0 ? formatNumber(metrics.production, { decimals: 1, smartDecimals: true }) : '-'}
+                      </TableCell>
 
-                            {/* Source Cost */}
-                            <TableCell className="text-center">
-                              {metrics.sourceCost > 0 ? formatNumber(metrics.sourceCost, { currency: true, decimals: 2 }) : '-'}
-                            </TableCell>
+                      {/* Consumption */}
+                      <TableCell className="text-center text-red-600">
+                        {metrics.consumption > 0 ? formatNumber(metrics.consumption, { decimals: 1, smartDecimals: true }) : '-'}
+                      </TableCell>
 
-                            {/* For Sale */}
-                            <TableCell className="text-center">
-                              <Input
-                                type="number"
-                                min="0"
-                                max={amount}
-                                value={forSaleValues[resourceId] || 0}
-                                onChange={(e) => handleForSaleChange(resourceId, parseInt(e.target.value) || 0)}
-                                className="w-20 h-8 text-center"
-                                disabled={amount === 0}
-                              />
-                            </TableCell>
+                      {/* Net */}
+                      <TableCell className="text-center">
+                        <span className={getNetValueColor(metrics.netChange)}>
+                          {metrics.netChange !== 0 ? formatWithSign(metrics.netChange) : '-'}
+                        </span>
+                      </TableCell>
 
-                            {/* Sale Price */}
-                            <TableCell className="text-center">
-                              <Input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={salePrices[resourceId] || 0}
-                                onChange={(e) => handleSalePriceChange(resourceId, parseFloat(e.target.value) || 0)}
-                                className="w-20 h-8 text-center"
-                                disabled={(forSaleValues[resourceId] || 0) === 0}
-                              />
-                            </TableCell>
+                      {/* Source Cost */}
+                      <TableCell className="text-center">
+                        {metrics.sourceCost > 0 ? formatNumber(metrics.sourceCost, { currency: true, decimals: 2 }) : '-'}
+                      </TableCell>
 
-                            {/* Amount */}
-                            <TableCell className="text-right font-semibold">
-                              {amount}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
+                      {/* For Sale */}
+                      <TableCell className="text-center">
+                        <Input
+                          type="number"
+                          min="0"
+                          max={amount}
+                          value={forSaleValues[resourceId] || 0}
+                          onChange={(e) => handleForSaleChange(resourceId, parseInt(e.target.value) || 0)}
+                          className="w-20 h-8 text-center"
+                          disabled={amount === 0}
+                        />
+                      </TableCell>
+
+                      {/* Sale Price */}
+                      <TableCell className="text-center">
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={salePrices[resourceId] || 0}
+                          onChange={(e) => handleSalePriceChange(resourceId, parseFloat(e.target.value) || 0)}
+                          className="w-20 h-8 text-center"
+                          disabled={(forSaleValues[resourceId] || 0) === 0}
+                        />
+                      </TableCell>
+
+                      {/* Amount */}
+                      <TableCell className="text-right font-semibold">
+                        {amount}
+                      </TableCell>
+                    </TableRow>
+                  );
+                };
+
+                return (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[180px]">Resource</TableHead>
+                          <TableHead className="text-center w-[80px]">Import</TableHead>
+                          <TableHead className="text-center w-[80px]">Export</TableHead>
+                          <TableHead className="text-center w-[100px]">Production</TableHead>
+                          <TableHead className="text-center w-[110px]">Consumption</TableHead>
+                          <TableHead className="text-center w-[80px]">Net</TableHead>
+                          <TableHead className="text-center w-[100px]">Source Cost</TableHead>
+                          <TableHead className="text-center w-[100px]">For Sale</TableHead>
+                          <TableHead className="text-center w-[100px]">Sale Price</TableHead>
+                          <TableHead className="text-right w-[100px]">Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {/* Active Recipe Inputs */}
+                        {categorized.activeRecipeInputs.length > 0 && (
+                          <>
+                            <TableRow 
+                              className="bg-blue-50 hover:bg-blue-100 cursor-pointer"
+                              onClick={() => toggleSection('activeRecipeInputs')}
+                            >
+                              <TableCell colSpan={10} className="font-semibold text-blue-900">
+                                <div className="flex items-center gap-2">
+                                  {expandedSections.activeRecipeInputs ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                  )}
+                                  <span>Active Recipe Inputs ({categorized.activeRecipeInputs.length})</span>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                            {expandedSections.activeRecipeInputs && categorized.activeRecipeInputs.map(renderResourceRow)}
+                          </>
+                        )}
+
+                        {/* Facility Inputs (excluding active recipe inputs) */}
+                        {categorized.facilityInputs.length > 0 && (
+                          <>
+                            <TableRow 
+                              className="bg-green-50 hover:bg-green-100 cursor-pointer"
+                              onClick={() => toggleSection('facilityInputs')}
+                            >
+                              <TableCell colSpan={10} className="font-semibold text-green-900">
+                                <div className="flex items-center gap-2">
+                                  {expandedSections.facilityInputs ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                  )}
+                                  <span>Facility Inputs ({categorized.facilityInputs.length})</span>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                            {expandedSections.facilityInputs && categorized.facilityInputs.map(renderResourceRow)}
+                          </>
+                        )}
+
+                        {/* Facility Outputs */}
+                        {categorized.facilityOutputs.length > 0 && (
+                          <>
+                            <TableRow 
+                              className="bg-purple-50 hover:bg-purple-100 cursor-pointer"
+                              onClick={() => toggleSection('facilityOutputs')}
+                            >
+                              <TableCell colSpan={10} className="font-semibold text-purple-900">
+                                <div className="flex items-center gap-2">
+                                  {expandedSections.facilityOutputs ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                  )}
+                                  <span>Facility Outputs ({categorized.facilityOutputs.length})</span>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                            {expandedSections.facilityOutputs && categorized.facilityOutputs.map(renderResourceRow)}
+                          </>
+                        )}
+
+                        {/* Other Resources */}
+                        {categorized.otherResources.length > 0 && (
+                          <>
+                            <TableRow 
+                              className="bg-gray-50 hover:bg-gray-100 cursor-pointer"
+                              onClick={() => toggleSection('otherResources')}
+                            >
+                              <TableCell colSpan={10} className="font-semibold text-gray-900">
+                                <div className="flex items-center gap-2">
+                                  {expandedSections.otherResources ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                  )}
+                                  <span>Other Resources ({categorized.otherResources.length})</span>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                            {expandedSections.otherResources && categorized.otherResources.map(renderResourceRow)}
+                          </>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                );
+              })()}
               
               <div className="mt-4 pt-4 border-t">
                 <div className="flex items-center justify-between mb-2">
@@ -705,350 +868,230 @@ export function FacilityDetail({ facilityId, currentCompany: _currentCompany, on
             {/* Production Tab */}
             <TabsContent value="production" className="px-6 pb-6">
               <div className="space-y-4">
-                {/* Active Production */}
-          {facility.activeRecipeId && (() => {
-            const activeRecipe = getRecipe(facility.activeRecipeId);
-            const progressTicks = facility.progressTicks ?? 0;
-            const totalTicks = activeRecipe.processingTicks;
-            const progressPercent = totalTicks > 0 ? (progressTicks / totalTicks) * 100 : 0;
-            
-            // Get current game tick to calculate started tick and completion tick
-            const gameState = getGameState();
-            const currentTick = gameState.time.tick;
-            const startedTick = currentTick - progressTicks;
-            const completionTick = startedTick + totalTicks;
-            
-            // Get main output resource for display
-            const mainOutput = activeRecipe.outputs[0];
-            const outputIcon = mainOutput ? getResourceIcon(mainOutput.resourceId) : '';
-            const outputName = mainOutput ? getResourceName(mainOutput.resourceId) : '';
-            const outputAmount = mainOutput?.quantity || 0;
-            
-            return (
-              <Card className="border-l-4 border-l-green-500">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div>
-                        <CardTitle className="flex items-center gap-2">
-                          Producing: {outputIcon} {outputName}
-                        </CardTitle>
-                        <CardDescription>Currently producing: {activeRecipe.name}</CardDescription>
-                      </div>
-                      <Badge 
-                        variant="outline" 
-                        className="text-xs bg-green-100 text-green-800 border-green-200 relative"
-                      >
-                        <div className="absolute inset-0 bg-green-300 opacity-50 animate-[ping_2s_ease-in-out_infinite] rounded-md" />
-                        <span className="relative z-10">Producing</span>
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowRecipes(!showRecipes)}
-                      >
-                        {showRecipes ? 'Hide Recipes' : 'Change Recipe'}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleStopProduction}
-                        disabled={isStopping}
-                      >
-                        <Square className="h-4 w-4 mr-2" />
-                        Stop
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-muted-foreground">Progress</span>
-                        <span className="text-sm font-semibold">
-                          {progressTicks} / {totalTicks} ticks ({Math.round(progressPercent)}%)
-                        </span>
-                      </div>
-                      <div className="w-full bg-muted rounded-full h-3">
-                        <div
-                          className="bg-green-500 h-3 rounded-full transition-all duration-300"
-                          style={{ width: `${Math.min(progressPercent, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                    
-                    {/* Production Status Information */}
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t">
-                      <span>Started at tick #{startedTick}</span>
-                      <span className="mx-1">•</span>
-                      <span>Will produce</span>
-                      <span className="font-medium text-green-700">
-                        {outputAmount} {outputIcon} {outputName}
-                      </span>
-                      <span>@Tick #{completionTick}</span>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4 pt-2 border-t">
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-1">Inputs</p>
-                        {activeRecipe.inputs.length === 0 ? (
-                          <p className="text-sm italic text-muted-foreground">None</p>
-                        ) : (
-                          <ul className="text-sm space-y-1">
-                            {activeRecipe.inputs.map((input, idx) => (
-                              <li key={idx} className="flex items-center gap-1">
-                                <span>{getResourceIcon(input.resourceId)}</span>
-                                <span>{getResourceName(input.resourceId)} × {input.quantity}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-1">Outputs</p>
-                        {activeRecipe.outputs.length === 0 ? (
-                          <p className="text-sm italic text-muted-foreground">None</p>
-                        ) : (
-                          <ul className="text-sm space-y-1">
-                            {activeRecipe.outputs.map((output, idx) => (
-                              <li key={idx} className="flex items-center gap-1">
-                                <span>{getResourceIcon(output.resourceId)}</span>
-                                <span>{getResourceName(output.resourceId)} × {output.quantity}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })()}
+                {/* Active Production Card */}
+                {(() => {
+                  const activeRecipe = getRecipe(facility.activeRecipeId!);
+                  if (!activeRecipe) return null;
+                  
+                  const progressTicks = facility.progressTicks ?? 0;
+                  const totalTicks = activeRecipe.processingTicks;
+                  const progressPercent = totalTicks > 0 ? (progressTicks / totalTicks) * 100 : 0;
+                  
+                  const gameState = getGameState();
+                  const currentTick = gameState.time.tick;
+                  const startedTick = currentTick - progressTicks;
+                  const completionTick = startedTick + totalTicks;
+                  
+                  const mainOutput = activeRecipe.outputs[0];
+                  const outputIcon = mainOutput ? getResourceIcon(mainOutput.resourceId) : '';
+                  const outputName = mainOutput ? getResourceName(mainOutput.resourceId) : '';
+                  const outputAmount = mainOutput?.quantity || 0;
+                  
+                  return (
+                    <Card className="border-l-4 border-l-green-500">
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div>
+                              <CardTitle className="flex items-center gap-2">
+                                Producing: {outputIcon} {outputName}
+                              </CardTitle>
+                              <CardDescription>Currently producing: {activeRecipe.name}</CardDescription>
+                            </div>
+                            {!facility.isProducing ? (
+                              <Badge 
+                                variant="outline" 
+                                className="text-xs bg-gray-100 text-gray-800 border-gray-200"
+                              >
+                                Stopped
+                              </Badge>
+                            ) : !hasRequiredInputs(facility.activeRecipeId!) ? (
+                              <Badge 
+                                variant="outline" 
+                                className="text-xs bg-orange-100 text-orange-800 border-orange-200"
+                              >
+                                Needs Input
+                              </Badge>
+                            ) : (
+                              <Badge 
+                                variant="outline" 
+                                className="text-xs bg-green-100 text-green-800 border-green-200 relative"
+                              >
+                                <div className="absolute inset-0 bg-green-300 opacity-50 animate-[ping_2s_ease-in-out_infinite] rounded-md" />
+                                <span className="relative z-10">Producing</span>
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setShowRecipes(!showRecipes)}
+                            >
+                              {showRecipes ? 'Hide Recipes' : 'Change Recipe'}
+                            </Button>
+                            {facility.isProducing && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleStopProduction}
+                                disabled={isStopping}
+                              >
+                                Stop
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm text-muted-foreground">Progress</span>
+                              <span className="text-sm font-semibold">
+                                {progressTicks} / {totalTicks} ticks ({Math.round(progressPercent)}%)
+                              </span>
+                            </div>
+                            <div className="w-full bg-muted rounded-full h-3">
+                              <div
+                                className="bg-green-500 h-3 rounded-full transition-all duration-300"
+                                style={{ width: `${Math.min(progressPercent, 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t">
+                            <span>Started at tick #{startedTick}</span>
+                            <span className="mx-1">•</span>
+                            <span>Will produce</span>
+                            <span className="font-medium text-green-700">
+                              {outputAmount} {outputIcon} {outputName}
+                            </span>
+                            <span>@Tick #{completionTick}</span>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+                            <div>
+                              <p className="text-sm text-muted-foreground mb-1">Inputs</p>
+                              {activeRecipe.inputs.length === 0 ? (
+                                <p className="text-sm italic text-muted-foreground">None</p>
+                              ) : (
+                                <ul className="text-sm space-y-1">
+                                  {activeRecipe.inputs.map((input, idx) => (
+                                    <li key={idx} className="flex items-center gap-1">
+                                      <span>{getResourceIcon(input.resourceId)}</span>
+                                      <span>{getResourceName(input.resourceId)} × {input.quantity}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-sm text-muted-foreground mb-1">Outputs</p>
+                              {activeRecipe.outputs.length === 0 ? (
+                                <p className="text-sm italic text-muted-foreground">None</p>
+                              ) : (
+                                <ul className="text-sm space-y-1">
+                                  {activeRecipe.outputs.map((output, idx) => (
+                                    <li key={idx} className="flex items-center gap-1">
+                                      <span>{getResourceIcon(output.resourceId)}</span>
+                                      <span>{getResourceName(output.resourceId)} × {output.quantity}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
 
-                {/* Recipes Section - Always show if no active production, or show when toggle is on */}
-                {(!facility.activeRecipeId || showRecipes) && (
+                {/* Recipe Selection - Only show when user clicks "Change Recipe" */}
+                {showRecipes && (
                   <Card>
                     <CardHeader>
                       <CardTitle>Available Recipes</CardTitle>
                       <CardDescription>
-                        Select a recipe to start production
+                        Select a recipe to change production
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      {facility.availableRecipeIds.length === 0 ? (
-                        <p className="text-muted-foreground italic py-4 text-center">No recipes available</p>
-                      ) : (
-                        <div className="space-y-2">
-                          {/* Warning message when changing recipe during active production */}
-                          {facility.activeRecipeId && showRecipes && (
-                            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                              <p className="text-sm text-yellow-700">
-                                Current production will be canceled if you change recipes. Any input resources already consumed will not be returned.
-                              </p>
-                            </div>
-                          )}
-
-                          {/* No Recipe Active Card */}
-                          {!facility.activeRecipeId && (
-                            (() => {
-                              const redScheme = getTailwindClasses('red');
-                              return (
-                                <div
-                                  className={`w-full p-3 border rounded-md transition-all ${redScheme.background} ${redScheme.border}`}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <span className={`font-medium ${redScheme.text}`}>
-                                      ⚠️ No Recipe Active
-                                    </span>
-                                    <Badge className={`text-xs ${redScheme.badge}`}>
-                                      Waiting
-                                    </Badge>
+                      <div className="space-y-2">
+                        {facility.availableRecipeIds.map((recipeId) => {
+                          const recipe = getRecipe(recipeId);
+                          if (!recipe) return null;
+                          
+                          const isActive = facility.activeRecipeId === recipeId;
+                          
+                          return (
+                            <Button
+                              key={recipeId}
+                              onClick={() => {
+                                if (!isActive) {
+                                  handleStartProduction(recipeId);
+                                  setShowRecipes(false);
+                                }
+                              }}
+                              disabled={isStarting || isActive}
+                              variant="outline"
+                              className={`w-full justify-start h-auto flex flex-col items-start p-3 ${
+                                isActive 
+                                  ? 'bg-green-50 border-green-300 hover:bg-green-100' 
+                                  : 'hover:bg-blue-50'
+                              }`}
+                            >
+                              <div className="flex justify-between items-center w-full mb-2">
+                                <span className={`font-medium ${isActive ? 'text-green-700' : ''}`}>
+                                  {recipe.name}
+                                  {isActive && ' (Current)'}
+                                </span>
+                                <Badge variant="secondary" className="text-xs">
+                                  {recipe.processingTicks} {recipe.processingTicks === 1 ? 'tick' : 'ticks'}
+                                </Badge>
+                              </div>
+                              
+                              <div className="text-xs w-full space-y-1">
+                                <div className="flex items-start gap-2">
+                                  <span className="font-medium text-muted-foreground whitespace-nowrap">Inputs:</span>
+                                  <div className="flex-1">
+                                    {recipe.inputs.length === 0 ? (
+                                      <span className="text-muted-foreground italic">None</span>
+                                    ) : (
+                                      <span>
+                                        {recipe.inputs.map((input, idx) => (
+                                          <span key={idx}>
+                                            {idx > 0 && ', '}
+                                            {getResourceIcon(input.resourceId)} {getResourceName(input.resourceId)} × {input.quantity}
+                                          </span>
+                                        ))}
+                                      </span>
+                                    )}
                                   </div>
-                                  <p className={`text-xs mt-2 ${redScheme.text} opacity-80`}>
-                                    No production is currently running. Select a recipe below to start production.
-                                  </p>
                                 </div>
-                              );
-                            })()
-                          )}
-                  
-                  {facility.availableRecipeIds.map((recipeId) => {
-                    try {
-                      const recipe = getRecipe(recipeId);
-                      const isActive = facility.activeRecipeId === recipeId;
-                      const isSelected = selectedRecipeId === recipeId;
-                      const canStart = !facility.activeRecipeId; // Can start if no active production
-                      
-                      // Check if recipe is available (has required inputs)
-                      const recipeAvailability = checkRecipeAvailability(facility, recipeId);
-                      const isRecipeAvailable = recipeAvailability.available;
-                      
-                      // Get color scheme based on state
-                      const greenScheme = getTailwindClasses('green');
-                      const blueScheme = getTailwindClasses('blue');
-                      const redScheme = getTailwindClasses('red');
-                      
-                      // Format inputs with icons
-                      const formatInputs = () => {
-                        if (recipe.inputs.length === 0) return <span className="text-muted-foreground italic">No inputs required</span>;
-                        return (
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            {recipe.inputs.map((input, idx) => (
-                              <span key={idx} className="inline-flex items-center gap-1">
-                                <span>{getResourceIcon(input.resourceId)}</span>
-                                <span>{getResourceName(input.resourceId)}</span>
-                                <span className="font-semibold">× {input.quantity}</span>
-                              </span>
-                            ))}
-                          </div>
-                        );
-                      };
-                      
-                      // Format outputs with icons
-                      const formatOutputs = () => {
-                        if (recipe.outputs.length === 0) return <span className="text-muted-foreground italic">No outputs</span>;
-                        return (
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            {recipe.outputs.map((output, idx) => (
-                              <span key={idx} className="inline-flex items-center gap-1 text-green-700 font-medium">
-                                <span>{getResourceIcon(output.resourceId)}</span>
-                                <span>{getResourceName(output.resourceId)}</span>
-                                <span className="font-semibold">× {output.quantity}</span>
-                              </span>
-                            ))}
-                          </div>
-                        );
-                      };
-                      
-                      // Determine classes based on state
-                      const getButtonClasses = () => {
-                        if (!isRecipeAvailable) {
-                          return `w-full justify-start h-auto flex flex-col items-start p-3 transition-all ${redScheme.background} ${redScheme.border} opacity-60 cursor-not-allowed`;
-                        }
-                        if (isActive) {
-                          return `w-full justify-start h-auto flex flex-col items-start p-3 transition-all ${greenScheme.background} ${greenScheme.border} hover:bg-green-100`;
-                        }
-                        if (isSelected) {
-                          return `w-full justify-start h-auto flex flex-col items-start p-3 transition-all ${blueScheme.background} border-blue-300 hover:bg-blue-100`;
-                        }
-                        return `w-full justify-start h-auto flex flex-col items-start p-3 transition-all ${blueScheme.background} hover:bg-blue-100 ${blueScheme.border}`;
-                      };
-                      
-                      const textColor = !isRecipeAvailable 
-                        ? redScheme.text 
-                        : isActive 
-                        ? greenScheme.text 
-                        : blueScheme.text;
-                      const borderColor = !isRecipeAvailable 
-                        ? redScheme.border 
-                        : isActive 
-                        ? greenScheme.border 
-                        : blueScheme.border;
-                      const badgeClasses = !isRecipeAvailable 
-                        ? redScheme.badge 
-                        : isActive 
-                        ? greenScheme.badge 
-                        : blueScheme.badge;
-                      
-                      // Create tooltip content for unavailable recipes
-                      const tooltipContent = !isRecipeAvailable ? (
-                        <div className="space-y-2">
-                          <p className="font-semibold">Recipe Unavailable</p>
-                          <p className="text-sm">Missing input resources:</p>
-                          <ul className="text-sm space-y-1 list-disc list-inside">
-                            {recipeAvailability.missingResources.map((missing, idx) => (
-                              <li key={idx}>
-                                {getResourceIcon(missing.resourceId)} {getResourceName(missing.resourceId)}: 
-                                <span className="font-semibold"> {missing.available}/{missing.required}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : null;
-                      
-                      const buttonElement = (
-                        <Button
-                          key={recipeId}
-                          onClick={() => {
-                            setSelectedRecipeId(recipeId);
-                            if (canStart && !isActive && isRecipeAvailable) {
-                              handleStartProduction(recipeId);
-                            }
-                          }}
-                          disabled={isStarting || (isActive && !canStart) || !isRecipeAvailable}
-                          variant="outline"
-                          className={getButtonClasses()}
-                        >
-                          <div className="flex justify-between items-center w-full mb-2">
-                            <span className={`font-medium ${textColor}`}>
-                              {recipe.name}
-                              {isActive && ' (Current)'}
-                            </span>
-                            <Badge variant="secondary" className="text-xs">
-                              {recipe.processingTicks} {recipe.processingTicks === 1 ? 'tick' : 'ticks'}
-                            </Badge>
-                          </div>
-                          
-                          <div className="text-xs w-full space-y-2">
-                            <div className="flex items-start gap-2">
-                              <span className={`font-medium ${textColor} whitespace-nowrap`}>Inputs:</span>
-                              <div className="flex-1">{formatInputs()}</div>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <span className={`font-medium ${textColor} whitespace-nowrap`}>Outputs:</span>
-                              <div className="flex-1">{formatOutputs()}</div>
-                            </div>
-                          </div>
-                          
-                          {isActive && (
-                            <div className={`mt-2 pt-2 border-t ${borderColor} w-full`}>
-                              <Badge className={`text-xs ${badgeClasses}`}>
-                                Production Active
-                              </Badge>
-                            </div>
-                          )}
-                          {!isRecipeAvailable && !isActive && (
-                            <div className={`mt-2 pt-2 border-t ${borderColor} w-full`}>
-                              <Badge className={`text-xs ${badgeClasses}`}>
-                                Unavailable
-                              </Badge>
-                            </div>
-                          )}
-                        </Button>
-                      );
-                      
-                      // Wrap in tooltip if unavailable
-                      if (!isRecipeAvailable && tooltipContent) {
-                        return (
-                          <UnifiedTooltip
-                            key={recipeId}
-                            content={tooltipContent}
-                            title="Recipe Unavailable"
-                            side="top"
-                          >
-                            <div>{buttonElement}</div>
-                          </UnifiedTooltip>
-                        );
-                      }
-                      
-                      return buttonElement;
-                    } catch (error) {
-                      return (
-                        <div
-                          key={recipeId}
-                          className="w-full p-3 border rounded-md bg-muted text-muted-foreground text-sm"
-                        >
-                          Recipe not found: {recipeId}
-                        </div>
-                      );
-                    }
-                  })}
-                </div>
-              )}
+                                <div className="flex items-start gap-2">
+                                  <span className="font-medium text-muted-foreground whitespace-nowrap">Outputs:</span>
+                                  <div className="flex-1">
+                                    {recipe.outputs.length === 0 ? (
+                                      <span className="text-muted-foreground italic">None</span>
+                                    ) : (
+                                      <span className="text-green-700 font-medium">
+                                        {recipe.outputs.map((output, idx) => (
+                                          <span key={idx}>
+                                            {idx > 0 && ', '}
+                                            {getResourceIcon(output.resourceId)} {getResourceName(output.resourceId)} × {output.quantity}
+                                          </span>
+                                        ))}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </Button>
+                          );
+                        })}
+                      </div>
                     </CardContent>
                   </Card>
                 )}

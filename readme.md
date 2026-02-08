@@ -1,3 +1,5 @@
+THIS IS JUST A FRAMEWORK VERSION. NO Business logic here. Either use TRADERGAME01 or TRADERGAME04
+
 # Trader Game V 0.2
 **Local path**: C:\Users\krist\Documents\GitHub\tradergame02
 A multiplayer web-based trading game built with React, TypeScript, and Supabase, Vercel for production env.
